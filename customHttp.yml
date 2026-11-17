@@ -9,6 +9,9 @@
 #   script-src   'unsafe-inline' because Gatsby inlines its chunk map and the
 #                page-data loader; no script from another host is allowed
 #   style-src    'unsafe-inline' because Gatsby inlines the critical CSS
+# Permissions-Policy allows the camera for this site only: /scan/ reads
+# labels and barcodes with it (ADR-0009 in maker-5-shared). Web NFC needs no
+# entry.
 # A new endpoint (another region, a CDN for media, a font host) needs a line
 # here, or the browser blocks it: the console names the directive. Another
 # region means changing every eu-central-1 below.
@@ -24,7 +27,7 @@ customHeaders:
       - key: Referrer-Policy
         value: strict-origin-when-cross-origin
       - key: Permissions-Policy
-        value: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+        value: camera=(self), microphone=(), geolocation=(), payment=(), usb=()
       - key: Content-Security-Policy
         value: >-
           default-src 'self';
