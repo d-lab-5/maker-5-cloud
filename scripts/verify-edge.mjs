@@ -13,9 +13,9 @@
  *   7. the space's object round-trips through objectProxy (ADR-0004)
  *   8. the admin revokes the edge; its next call gets 410
  *
- *   APP_USER=… APP_PASSWORD=… APP_TOTP_FILE=… node scripts/verify-edge.mjs [--new-password '…']
+ *   MK_USER=… MK_PASSWORD=… APP_TOTP_FILE=… node scripts/verify-edge.mjs [--new-password '…']
  *
- * APP_USER must be in app-admins. APP_TOTP_FILE keeps the TOTP secret this
+ * MK_USER must be in mk-admins. APP_TOTP_FILE keeps the TOTP secret this
  * script sets up on the account's first run (0600), so later runs can sign
  * in; never commit it. Each run creates one tenant ("verify-edge …"): use a
  * sandbox, not production.
@@ -44,11 +44,11 @@ cognitoUserPoolsTokenProvider.setKeyValueStorage({
   clear: async () => void mem.clear(),
 });
 
-const { APP_USER: username, APP_PASSWORD: password, APP_TOTP_FILE: totpFile } = process.env;
+const { MK_USER: username, MK_PASSWORD: password, APP_TOTP_FILE: totpFile } = process.env;
 const newPasswordIdx = process.argv.indexOf("--new-password");
 const newPassword = newPasswordIdx > -1 ? process.argv[newPasswordIdx + 1] : undefined;
 if (!username || !password || !totpFile) {
-  console.error("\n  set APP_USER, APP_PASSWORD and APP_TOTP_FILE\n");
+  console.error("\n  set MK_USER, MK_PASSWORD and APP_TOTP_FILE\n");
   process.exit(2);
 }
 const EDGE = `${outputs.custom?.app?.edgeApi}/edge/v1`;
@@ -164,13 +164,13 @@ try {
     "the edge learns its tenant and spaces");
 
   /* 5. A-Box sync ------------------------------------------------------------ */
-  const P = "@prefix app: <https://template.dlab5.net/ontology#> . @prefix schema: <https://schema.org/> .\n";
-  const ttl = `${P}<https://template.dlab5.net/id/thing/t-verify> a app:Thing ; schema:name "Verified" .`;
+  const P = "@prefix m5: <https://maker-5.cloud/ontology#> . @prefix schema: <https://schema.org/> .\n";
+  const ttl = `${P}<https://maker-5.cloud/id/block/b-verify> a m5:Block ; schema:name "Verified" .`;
   const put1 = await edge("graphs/put", { name: shared.id, ttl, baseVersion: 0 }, { token });
   check(put1.status === 200 && put1.body.version === 1, "an A-Box is written", `version ${put1.body.version}`);
   const stale = await edge("graphs/put", { name: shared.id, ttl, baseVersion: 0 }, { token });
   check(stale.status === 409 && stale.body.current?.version === 1, "a stale write is a conflict with the current version");
-  const bad = await edge("graphs/put", { name: shared.id, ttl: `${P}<https://template.dlab5.net/id/thing/t-x> a app:Thing .`, baseVersion: 1 }, { token });
+  const bad = await edge("graphs/put", { name: shared.id, ttl: `${P}<https://maker-5.cloud/id/block/b-x> a m5:Block .`, baseVersion: 1 }, { token });
   check(bad.status === 422 && bad.body.problems?.length > 0, "an A-Box the shapes refuse is not stored", bad.body.problems?.[0]);
   const got = await edge("graphs/get", { name: shared.id }, { token });
   check(got.body.version === 1 && /Verified/.test(got.body.ttl ?? ""), "and reads back as written");

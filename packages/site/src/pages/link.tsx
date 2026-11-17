@@ -70,9 +70,9 @@ const LinkPage: React.FC = () => {
   if (!session.isAdmin) {
     return (
       <Shell active="link" title={t("nav.link")}>
-        <div className="app-empty">
+        <div className="mk-empty">
           <p>{t("link.adminonly")}</p>
-          <p className="app-muted">{t("link.askadmin")}</p>
+          <p className="mk-muted">{t("link.askadmin")}</p>
         </div>
       </Shell>
     );
@@ -80,15 +80,15 @@ const LinkPage: React.FC = () => {
 
   return (
     <Shell active="link" title={t("nav.link")}>
-      <div className="app-panel app-link">
-        <h2 className="app-panel__title">{t("link.code")}</h2>
-        <p className="app-panel__hint">{t("link.code.hint")}</p>
+      <div className="mk-panel mk-link">
+        <h2 className="mk-panel__title">{t("link.code")}</h2>
+        <p className="mk-panel__hint">{t("link.code.hint")}</p>
         <form
-          className="app-link__form"
+          className="mk-link__form"
           onSubmit={(e) => { e.preventDefault(); void look(code); }}
         >
           <input
-            className="app-input app-link__code"
+            className="mk-input mk-link__code"
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase())}
             placeholder="ABCD-EF23"
@@ -96,16 +96,16 @@ const LinkPage: React.FC = () => {
             autoComplete="off"
             spellCheck={false}
           />
-          <button type="submit" className="app-button app-button--ghost" disabled={busy || !CODE.test(code)}>
+          <button type="submit" className="mk-button mk-button--ghost" disabled={busy || !CODE.test(code)}>
             {t("link.lookup")}
           </button>
         </form>
 
-        {error && <p className="app-error" role="alert">{error}</p>}
+        {error && <p className="mk-error" role="alert">{error}</p>}
 
         {info && !outcome && (
           <>
-            <dl className="app-facts">
+            <dl className="mk-facts">
               <dt>{t("link.host")}</dt><dd>{info.hostname ?? "—"}</dd>
               <dt>{t("link.lan")}</dt><dd>{info.lan_ip ?? "—"}</dd>
               <dt>{t("link.version")}</dt><dd>{info.dhe_version ?? "—"}</dd>
@@ -113,19 +113,19 @@ const LinkPage: React.FC = () => {
               <dt>{t("link.status")}</dt><dd>{info.status}</dd>
             </dl>
             {info.status === "pending" && (
-              <div className="app-link__actions">
-                <p className="app-panel__hint">{t("link.approve.hint")}</p>
+              <div className="mk-link__actions">
+                <p className="mk-panel__hint">{t("link.approve.hint")}</p>
                 {tenants.length > 1 && (
-                  <select className="app-select" value={tenant} onChange={(e) => setTenant(e.target.value)} aria-label={t("link.tenant")}>
+                  <select className="mk-select" value={tenant} onChange={(e) => setTenant(e.target.value)} aria-label={t("link.tenant")}>
                     <option value="">{t("link.whichtenant")}</option>
                     {tenants.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
                   </select>
                 )}
-                {tenants.length === 1 && <span className="app-muted">{t("link.for", { name: tenants[0].name })}</span>}
-                <button type="button" className="app-button" disabled={busy || !tenant} data-help={t("help.link.approve")} onClick={() => void decide(true)}>
+                {tenants.length === 1 && <span className="mk-muted">{t("link.for", { name: tenants[0].name })}</span>}
+                <button type="button" className="mk-button" disabled={busy || !tenant} data-help={t("help.link.approve")} onClick={() => void decide(true)}>
                   {t("link.approve")}
                 </button>
-                <button type="button" className="app-button app-button--ghost" disabled={busy} data-help={t("help.link.deny")} onClick={() => void decide(false)}>
+                <button type="button" className="mk-button mk-button--ghost" disabled={busy} data-help={t("help.link.deny")} onClick={() => void decide(false)}>
                   {t("link.deny")}
                 </button>
               </div>
@@ -134,9 +134,9 @@ const LinkPage: React.FC = () => {
         )}
 
         {outcome === "approved" && (
-          <p className="app-ok" role="status">{t("link.approved")}</p>
+          <p className="mk-ok" role="status">{t("link.approved")}</p>
         )}
-        {outcome === "denied" && <p className="app-muted" role="status">{t("link.denied")}</p>}
+        {outcome === "denied" && <p className="mk-muted" role="status">{t("link.denied")}</p>}
       </div>
     </Shell>
   );
@@ -144,4 +144,4 @@ const LinkPage: React.FC = () => {
 
 export default LinkPage;
 
-export const Head: HeadFC = () => <title>Link an edge · template.dlab5</title>;
+export const Head: HeadFC = () => <title>Link an edge · maker-5.dlab5</title>;

@@ -1,6 +1,6 @@
 import { generateClient } from "aws-amplify/api";
-import type { DeviceCodeInfo, EdgeSummary, Space, Tenant } from "@dlab5/app-core";
-import { tenantCode } from "@dlab5/app-core";
+import type { DeviceCodeInfo, EdgeSummary, Space, Tenant } from "@dlab5/maker-5-core";
+import { tenantCode } from "@dlab5/maker-5-core";
 import { busy } from "../components/Feedback";
 
 /**

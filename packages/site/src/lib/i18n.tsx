@@ -1,7 +1,7 @@
 import * as React from "react";
-import en from "@dlab5/app-i18n/en.json";
-import de from "@dlab5/app-i18n/de.json";
-import fr from "@dlab5/app-i18n/fr.json";
+import en from "@dlab5/maker-5-i18n/en.json";
+import de from "@dlab5/maker-5-i18n/de.json";
+import fr from "@dlab5/maker-5-i18n/fr.json";
 
 /**
  * The interface in English, German or French (packages/i18n; English is the
@@ -19,7 +19,7 @@ export type Lang = "en" | "de" | "fr";
 export const LANGS: Array<[Lang, string]> = [["en", "English"], ["de", "Deutsch"], ["fr", "Français"]];
 type Catalog = Record<string, string>;
 const CATALOGS: Record<Lang, Catalog> = { en: en as Catalog, de: de as Catalog, fr: fr as Catalog };
-const KEY = "app-lang";
+const KEY = "mk-lang";
 
 const isLang = (v: unknown): v is Lang => v === "en" || v === "de" || v === "fr";
 
@@ -109,7 +109,7 @@ export function useAccountLang(locale: string | undefined) {
 export function LangPicker({ className }: { className?: string }) {
   const { lang, setLang, t } = useT();
   return (
-    <select className={className ?? "app-select app-select--small"} value={lang} aria-label={t("app.language")}
+    <select className={className ?? "mk-select mk-select--small"} value={lang} aria-label={t("app.language")}
       onChange={(e) => setLang(e.target.value as Lang)}>
       {LANGS.map(([l, name]) => <option key={l} value={l}>{name}</option>)}
     </select>

@@ -131,7 +131,7 @@ export function toolItems(id: string): RailItem[] {
 
 function Mark() {
   return (
-    <span className="app-mark" aria-hidden="true">
+    <span className="mk-mark" aria-hidden="true">
       <svg
         width="18"
         height="18"
@@ -172,12 +172,12 @@ function SpaceSwitcher({ id }: { id?: string }) {
   const manyTenants = new Set(spaces?.map((s) => s.tenantId)).size > 1;
 
   return (
-    <div className="app-rail__switcher">
-      <label className="app-rail__switcherlabel" htmlFor="app-space">
+    <div className="mk-rail__switcher">
+      <label className="mk-rail__switcherlabel" htmlFor="mk-space">
         {id ? t("shell.space") : t("shell.openspace")}
       </label>
       <select
-        id="app-space"
+        id="mk-space"
         value={id ?? ""}
         disabled={empty}
         onChange={(e) => {
@@ -219,8 +219,8 @@ function RailSection({
   children: React.ReactNode;
 }) {
   return (
-    <div className="app-rail__section">
-      <h2 className="app-rail__sectionlabel">{label}</h2>
+    <div className="mk-rail__section">
+      <h2 className="mk-rail__sectionlabel">{label}</h2>
       {children}
     </div>
   );
@@ -228,22 +228,22 @@ function RailSection({
 
 function RailLinks({ items, active }: { items: RailItem[]; active: string }) {
   return (
-    <ul className="app-rail__items">
+    <ul className="mk-rail__items">
       {items.map((item) => (
         <li key={item.key}>
           {/* A plain <a>, not gatsby's <Link>: these are matchPath routes, so
               there is no page for Gatsby to prefetch and Link would warn. */}
           <a
             href={item.href}
-            className={`app-rail__item${
-              item.key === active ? " app-rail__item--on" : ""
+            className={`mk-rail__item${
+              item.key === active ? " mk-rail__item--on" : ""
             }`}
             aria-current={item.key === active ? "page" : undefined}
           >
             {item.icon}
             {item.label}
             {item.key === active && (
-              <span className="app-rail__dot" aria-hidden="true" />
+              <span className="mk-rail__dot" aria-hidden="true" />
             )}
           </a>
         </li>
@@ -272,15 +272,15 @@ export function Shell({ children, space, active, title }: ShellProps) {
   const [railOpen, setRailOpen] = React.useState(true);
 
   return (
-    <div className="app-shell app-shell--railed">
+    <div className="mk-shell mk-shell--railed">
       <nav
-        className={`app-rail${railOpen ? "" : " app-rail--closed"}`}
+        className={`mk-rail${railOpen ? "" : " mk-rail--closed"}`}
         aria-label={space ? t("shell.spaceviews") : t("nav.spaces")}
       >
-        <Link className="app-rail__brand" to="/">
+        <Link className="mk-rail__brand" to="/">
           <Mark />
           <span>
-            template<span className="app-rail__brandaccent">.dlab5</span>
+            template<span className="mk-rail__brandaccent">.dlab5</span>
           </span>
         </Link>
 
@@ -304,14 +304,14 @@ export function Shell({ children, space, active, title }: ShellProps) {
 
         <RailSection label={t("shell.appearance")}>
           <ThemeSegments />
-          <LangPicker className="app-select app-select--small" />
+          <LangPicker className="mk-select mk-select--small" />
           <HelpSwitch />
         </RailSection>
 
         <RailSection label={t("shell.account")}>
-          <ul className="app-rail__items">
+          <ul className="mk-rail__items">
             <li>
-              <Link className={`app-rail__item${active === "settings" ? " app-rail__item--on" : ""}`} to="/settings/">
+              <Link className={`mk-rail__item${active === "settings" ? " mk-rail__item--on" : ""}`} to="/settings/">
                 {icon(
                   <>
                     <circle cx="12" cy="12" r="3" />
@@ -323,7 +323,7 @@ export function Shell({ children, space, active, title }: ShellProps) {
             </li>
             {(session.isAdmin || session.isOperator) && (
               <li>
-                <Link className={`app-rail__item${active === "link" ? " app-rail__item--on" : ""}`} to="/link/">
+                <Link className={`mk-rail__item${active === "link" ? " mk-rail__item--on" : ""}`} to="/link/">
                   {icon(
                     <>
                       <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" />
@@ -335,7 +335,7 @@ export function Shell({ children, space, active, title }: ShellProps) {
               </li>
             )}
             <li>
-              <Link className={`app-rail__item${active === "about" ? " app-rail__item--on" : ""}`} to="/about/">
+              <Link className={`mk-rail__item${active === "about" ? " mk-rail__item--on" : ""}`} to="/about/">
                 {icon(
                   <>
                     <circle cx="12" cy="12" r="9" />
@@ -347,8 +347,8 @@ export function Shell({ children, space, active, title }: ShellProps) {
             </li>
             <li>
               <a
-                className="app-rail__item"
-                href="https://github.com/d-lab-5/template-dlab5-cloud"
+                className="mk-rail__item"
+                href="https://github.com/d-lab-5/maker-5-cloud"
                 target="_blank"
                 rel="noreferrer noopener"
               >
@@ -361,7 +361,7 @@ export function Shell({ children, space, active, title }: ShellProps) {
             <li>
               <button
                 type="button"
-                className="app-rail__item app-rail__item--button"
+                className="mk-rail__item mk-rail__item--button"
                 data-help={t("help.signout")}
                 onClick={() => void signOutAndReload()}
               >
@@ -375,18 +375,18 @@ export function Shell({ children, space, active, title }: ShellProps) {
               </button>
             </li>
           </ul>
-          <p className="app-rail__who">
+          <p className="mk-rail__who">
             {session.email ?? session.username}
             {session.isOperator ? ` · ${t("set.role.operator")}` : session.isAdmin ? ` · ${t("set.role.admin")}` : ""}
           </p>
         </RailSection>
       </nav>
 
-      <div className="app-shell__body">
-        <header className="app-shell__header">
+      <div className="mk-shell__body">
+        <header className="mk-shell__header">
           <button
             type="button"
-            className="app-linkbutton app-shell__railtoggle"
+            className="mk-linkbutton mk-shell__railtoggle"
             onClick={() => setRailOpen((open) => !open)}
             aria-label={railOpen ? t("shell.hidemenu") : t("shell.showmenu")}
             data-help={railOpen ? t("shell.hidemenu") : t("shell.showmenu")}
@@ -394,14 +394,14 @@ export function Shell({ children, space, active, title }: ShellProps) {
           >
             ☰
           </button>
-          <span className="app-shell__title">
+          <span className="mk-shell__title">
             {space ? (space.name ?? space.id) : (title ?? t("nav.spaces"))}
           </span>
-          <span className="app-shell__meta">/ internal · admin-provisioned</span>
-          <span className="app-shell__spacer" />
+          <span className="mk-shell__meta">/ internal · admin-provisioned</span>
+          <span className="mk-shell__spacer" />
         </header>
 
-        <main className="app-shell__main">{children}</main>
+        <main className="mk-shell__main">{children}</main>
       </div>
     </div>
   );

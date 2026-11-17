@@ -7,7 +7,7 @@
   "about.install": "Eine Edge auf einem anderen Rechner installieren",
   "about.lede": "Die Bereiche eines Mandanten, was er über sie weiß, und die Edges, die mit ihm verbunden sind.",
   "about.licence": "Lizenz",
-  "about.licence.hint": "Gebaut aus template-dlab5-cloud, GPL-3.0-Software von D-LAB-5.",
+  "about.licence.hint": "Gebaut aus maker-5-cloud, AGPL-3.0-Software von D-LAB-5.",
   "about.minedge": "Mindestversion der Edge",
   "about.title": "Über",
   "about.version": "Version",

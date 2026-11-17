@@ -1,27 +1,26 @@
-# D-LAB-5 cloud template
+# Maker-5 cloud
 
-A runnable skeleton for the **cloud** half of a D-LAB-5 cloud-and-edge product:
-**Gatsby 5 / React 18** in front, an **AWS Amplify Gen 2** backend behind, one
-Cognito gate over the whole thing, **tenants with spaces**, and an API that
-**edges** link to. Fork it, rename it, and start on the part that is actually
-yours.
+Cloud lifecycle portal and semantic graph engine for **Maker-5**, at
+**maker-5.cloud**. It orchestrates hardware and software product design with
+human-in-the-loop AI agents.
 
-The edge half — the local app a person, a home server or a robot runs — is
-[`template-dlab5-edge`](https://github.com/d-lab-5/template-dlab5-edge). The
-patterns both implement are an ArchiMate blueprint,
-[`cloud-edge-platform.ttl`](https://github.com/d-lab-5/blueprinting-dlab5-net/blob/stage/docs/patterns/cloud-edge-platform.ttl)
-in blueprinting-dlab5-net, with the Mediathek and DigitalHome.Cloud as its two
-instances. (This repository was `template-dlab5-net`; GitHub redirects the old
-name.)
+The portal manages your product portfolio, system blueprints, architecture
+decisions and AI agent proposals in one semantic graph. Agents analyse
+requirements and propose changes, and a person reviews and approves every
+step. It is the cloud half of Maker-5. The local half is
+[maker-5-edge](https://github.com/d-lab-5/maker-5-edge), which runs on a
+workstation or lab bench. The decisions, roadmap and ontology reference are at
+[maker-5-shared](https://github.com/d-lab-5/maker-5-shared), published at
+https://docs.dlab5.net/d-lab-5/maker-5/.
 
-It is deliberately not a product. What it carries is the shape — and the dozen
-constraints that shape has already cost someone a day each to discover,
-recorded in [`docs/adr/`](docs/adr/).
+In this repository a **workspace** is a tenant and a **product** is a space.
+Each product's knowledge is an RDF A-Box, checked against the Maker-5 T-Box
+and SHACL shapes in [`packages/ontology`](packages/ontology). The shapes link
+hardware blocks, interfaces, software modules and agent proposals, using
+SysML v2, PROV-O and SPDX.
 
-Working guidance for Claude Code lives outside the repository, as the
-`dlab5-cloud-template` skill, so it follows you into every fork instead of
-being copied once and left to drift. `CLAUDE.md` is git-ignored here: keep a
-local one if you want, it will not be committed.
+Made from [template-dlab5-cloud](https://github.com/d-lab-5/template-dlab5-cloud).
+Its decisions, which this product inherits, are in [`docs/adr/`](docs/adr/).
 
 ## What you get
 
@@ -84,7 +83,7 @@ build passing in that state is a property worth keeping — a frontend-only
 rebuild must never fail the branch.
 
 Once the backend is up, create a user in the Cognito console and add them to
-`app-admins` (the demo user already is). There is no sign-up: the landing page
+`mk-admins` (the demo user already is). There is no sign-up: the landing page
 is the sign-in page. An operator sets up two-step sign-in on first sign-in,
 then creates the first tenant in Settings → Operator, naming its first admin.
 
@@ -119,36 +118,6 @@ stops the dev server, not the backend. Remove it deliberately:
 npm --prefix backend run sandbox:delete
 ```
 
-## Forking it
-
-```bash
-node scripts/rename.mjs --name "Fleet" --slug fleet --prefix fl \
-  --domain fleet.dlab5.net --repo d-lab-5/fleet-dlab5-cloud \
-  --tenant Household --space Vault --dry-run
-```
-
-The script rewrites the CSS prefix, the design tokens, the Cognito group names,
-the theme attribute and storage key, the package names, the domain and the
-titles — all of which have to move together — and, with `--tenant`/`--space`,
-the English interface nouns (the models and ids stay `Tenant`/`Space`,
-`t-`/`s-`; German and French are yours to adjust). Drop `--dry-run`, then reinstall,
-because the workspace package names changed:
-
-```bash
-rm -rf node_modules packages/*/node_modules package-lock.json
-npm install && npm --prefix backend install && npm test && npm run build
-```
-
-What is placeholder and expected to go: the five stub views in
-`packages/site/src/pages/w.tsx`, the menu arrays in `Shell.tsx`, the hero copy
-in `GuestLanding.tsx`, the placeholder ontology in `packages/ontology`, and
-this README.
-
-What should survive untouched, because it is the point of the template:
-`AuthGate`, `lib/amplify.ts`, `useTheme`, `gatsby-ssr.tsx`, `gatsby-node.ts`,
-`amplify.yml`, the `objectProxy` Lambda, the hardening in `backend.ts`, the
-`tenants` and edge functions, `tokens.css`, and the `scripts/`.
-
 ## Stack
 
 Gatsby 5 · React 18 · TypeScript · AWS Amplify Gen 2 · Cognito · AppSync ·
@@ -156,9 +125,6 @@ DynamoDB · S3 · API Gateway (HTTP) · RDF/SHACL · npm workspaces · Node 22.
 
 ## Licence
 
-**GPL-3.0-or-later** — see [LICENSE](LICENSE) and [COPYRIGHT](COPYRIGHT).
-
-This is a template, so the choice reaches further than usual: **anything forked
-from it inherits GPL-3.0**, and a project built on it must be free software
-too. That is the intent. If you need a permissive licence for a particular
-piece of work, this template is not the starting point for it.
+**AGPL-3.0-or-later**: see [LICENSE](LICENSE) and [COPYRIGHT](COPYRIGHT). If
+you run a modified version of this portal as a network service, you must offer
+its source to the people who use it.

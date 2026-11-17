@@ -1,4 +1,4 @@
-# @dlab5/app-i18n
+# @dlab5/maker-5-i18n
 
 The interface texts of the site (and of its edges, which keep a copy), in
 English (the master), German and French. One flat JSON object per language:

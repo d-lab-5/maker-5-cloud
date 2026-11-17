@@ -54,11 +54,11 @@ test("the object key is derived from the id, never from the name", () => {
 
 test("groups say who administers which tenant and reads which space", () => {
   const t = mintTenantId(), s = mintSpaceId();
-  const groups = ["app-admins", t, s, "something-else"];
+  const groups = ["mk-admins", t, s, "something-else"];
   assert.deepEqual(tenantsOf(groups), [t]);
   assert.deepEqual(spacesOf(groups), [s]);
   assert.ok(isMember([s]) && isMember([t]));
-  assert.ok(!isMember(["app-admins"]), "an operator is not a member by being one");
+  assert.ok(!isMember(["mk-admins"]), "an operator is not a member by being one");
 });
 
 test("a tenant code lists the tenant, its shared space, then private ones", () => {

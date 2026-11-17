@@ -15,7 +15,7 @@ import { edgeRelease } from "../functions/edgeRelease/resource";
  * TENANCY (ADR-0005). A Tenant (a family, a home, a team) holds Spaces. Both
  * are Cognito groups named like their minted ids: `t-…` are the tenant's
  * admins, `s-…` a space's readers. The `tenants` function is the only writer
- * of the rows and the groups. Operators (`app-admins`) create tenants and see
+ * of the rows and the groups. Operators (`mk-admins`) create tenants and see
  * their names; they read no tenant content.
  *
  * KEEP IN STEP BY HAND with `packages/core/src/types.ts`. The site cannot
@@ -38,7 +38,7 @@ const schema = a.schema({
     })
     .authorization((allow) => [
       allow.groupDefinedIn("id").to(["read"]),
-      allow.group("app-admins").to(["read"]),       // operators see names, not content
+      allow.group("mk-admins").to(["read"]),       // operators see names, not content
     ]),
 
   /**
@@ -235,7 +235,7 @@ const schema = a.schema({
     .mutation()
     .arguments({ name: a.string().required(), adminEmail: a.string().required(), sameAs: a.string() })
     .returns(a.ref("Tenant"))
-    .authorization((allow) => [allow.group("app-admins")])
+    .authorization((allow) => [allow.group("mk-admins")])
     .handler(a.handler.function(tenants)),
 
   addSpace: a

@@ -67,12 +67,12 @@ export function BusyCard() {
   }, [working]);
 
   return (
-    <div className={`app-busy${shown ? " app-busy--on" : ""}`} role="status" aria-live="polite">
+    <div className={`mk-busy${shown ? " mk-busy--on" : ""}`} role="status" aria-live="polite">
       {shown && (
-        <div className="app-busy__card">
-          <span className="app-busy__glass" aria-hidden="true" />
-          <span className="app-busy__word">{t("lib.loading")}</span>
-          <i className="app-busy__bar" aria-hidden="true" />
+        <div className="mk-busy__card">
+          <span className="mk-busy__glass" aria-hidden="true" />
+          <span className="mk-busy__word">{t("lib.loading")}</span>
+          <i className="mk-busy__bar" aria-hidden="true" />
         </div>
       )}
     </div>
@@ -81,7 +81,7 @@ export function BusyCard() {
 
 /* -- the help switch ------------------------------------------------------- */
 
-export const HELP_KEY = "app-help";
+export const HELP_KEY = "mk-help";
 let helpOn = true;
 const helpListeners = new Set<(on: boolean) => void>();
 
@@ -100,7 +100,7 @@ export function setHelp(on: boolean): void {
   } catch {
     /* storage blocked: this page only */
   }
-  document.documentElement.setAttribute("data-app-help", on ? "on" : "off");
+  document.documentElement.setAttribute("data-mk-help", on ? "on" : "off");
   helpListeners.forEach((f) => f(on));
 }
 
@@ -127,7 +127,7 @@ export function HelpSwitch() {
   return (
     <button
       type="button"
-      className={`app-helpswitch${on ? " app-helpswitch--on" : ""}`}
+      className={`mk-helpswitch${on ? " mk-helpswitch--on" : ""}`}
       aria-pressed={on}
       data-help={t("help.switch.on")}
       title={on ? undefined : t("help.switch.off")}
@@ -151,7 +151,7 @@ const HELP_AFTER_MS = 600;
 export function HelpLayer() {
   React.useEffect(() => {
     helpOn = savedHelp();
-    document.documentElement.setAttribute("data-app-help", helpOn ? "on" : "off");
+    document.documentElement.setAttribute("data-mk-help", helpOn ? "on" : "off");
     helpListeners.forEach((f) => f(helpOn));
 
     let timer: number | undefined;
@@ -163,11 +163,11 @@ export function HelpLayer() {
       // inside a fullscreen element, or it would not be drawn at all
       const full = document.fullscreenElement;
       const host = target.closest("dialog[open]") ?? (full && full.contains(target) ? full : document.body);
-      let el = document.getElementById("app-help");
+      let el = document.getElementById("mk-help");
       if (!el) {
         el = document.createElement("div");
-        el.id = "app-help";
-        el.className = "app-help";
+        el.id = "mk-help";
+        el.className = "mk-help";
         el.setAttribute("role", "tooltip");
       }
       if (el.parentElement !== host) host.appendChild(el);
@@ -178,9 +178,9 @@ export function HelpLayer() {
       window.clearTimeout(timer);
       timer = undefined;
       pending = null;
-      if (shown?.getAttribute("aria-describedby") === "app-help") shown.removeAttribute("aria-describedby");
+      if (shown?.getAttribute("aria-describedby") === "mk-help") shown.removeAttribute("aria-describedby");
       shown = null;
-      const el = document.getElementById("app-help");
+      const el = document.getElementById("mk-help");
       if (el) el.hidden = true;
     };
 
@@ -197,7 +197,7 @@ export function HelpLayer() {
       const left = Math.min(Math.max(4, r.left + r.width / 2 - tip.width / 2), window.innerWidth - tip.width - 4);
       el.style.top = `${Math.round(top)}px`;
       el.style.left = `${Math.round(left)}px`;
-      target.setAttribute("aria-describedby", "app-help");
+      target.setAttribute("aria-describedby", "mk-help");
       shown = target;
     };
 

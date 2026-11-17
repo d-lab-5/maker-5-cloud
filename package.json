@@ -1,20 +1,20 @@
 {
-  "name": "template-dlab5-cloud",
+  "name": "maker-5-cloud",
   "private": true,
   "description": "D-LAB-5 fullstack template — Gatsby 5 frontend, Amplify Gen 2 backend, one Cognito gate",
-  "license": "GPL-3.0-or-later",
+  "license": "AGPL-3.0-or-later",
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
     "build": "npm run build:core && npm run build:web",
-    "build:core": "npm run build -w @dlab5/app-core",
-    "build:web": "npm run build -w @dlab5/app-site",
+    "build:core": "npm run build -w @dlab5/maker-5-core",
+    "build:web": "npm run build -w @dlab5/maker-5-site",
     "dev": "bash scripts/dev.sh",
     "demo": "python3 scripts/demo.py",
-    "dev:web": "npm run develop -w @dlab5/app-site",
-    "start:web": "npm run serve -w @dlab5/app-site",
-    "clean:web": "npm run clean -w @dlab5/app-site",
+    "dev:web": "npm run develop -w @dlab5/maker-5-site",
+    "start:web": "npm run serve -w @dlab5/maker-5-site",
+    "clean:web": "npm run clean -w @dlab5/maker-5-site",
     "test": "npm run test --workspaces --if-present",
     "backend:install": "npm --prefix backend install",
     "backend:sandbox": "npm --prefix backend run sandbox",

@@ -51,7 +51,7 @@ SITE_OUTPUTS = SITE / "src" / "amplify_outputs.json"
 # keystroke in a demo.
 DEMO_EMAIL = os.environ.get("DEMO_EMAIL", "demo-user@example.com")
 DEMO_PASSWORD = os.environ.get("DEMO_PASSWORD", "Demo-user$1")
-ADMIN_GROUP = "app-admins"
+ADMIN_GROUP = "mk-admins"
 
 # -- output ------------------------------------------------------------------
 
@@ -344,7 +344,7 @@ def ensure_demo_user(profile):
     print(f"    password  {bold(DEMO_PASSWORD)}\n")
     para(
         dim(
-            "An operator (app-admins). On first sign-in it must set up two-step\n"
+            "An operator (mk-admins). On first sign-in it must set up two-step\n"
             "sign-in (an authenticator app); then Settings → Operator creates a\n"
             "tenant with this account as its first admin, and its shared space."
         )

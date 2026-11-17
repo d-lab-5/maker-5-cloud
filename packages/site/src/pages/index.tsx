@@ -34,21 +34,21 @@ const IndexPage: React.FC<PageProps> = () => {
 
   return (
     <Shell title={t("nav.spaces")}>
-      <div className="app-hero">
-        <div className="app-hero__copy">
+      <div className="mk-hero">
+        <div className="mk-hero__copy">
           {/* No standing copy here. The cards below say what this page is for,
               and a paragraph explaining the product to someone who has already
               signed in is a paragraph nobody reads twice. */}
-          <dl className="app-stats">
-            <div className="app-stat">
+          <dl className="mk-stats">
+            <div className="mk-stat">
               <dt>{spaces?.length ?? "—"}</dt>
               <dd>{t("home.spaces")}</dd>
             </div>
-            <div className="app-stat">
+            <div className="mk-stat">
               <dt>{session.tenants.length}</dt>
               <dd>{t("home.admin")}</dd>
             </div>
-            <div className="app-stat">
+            <div className="mk-stat">
               <dt>{session.isOperator ? t("set.role.operator") : session.isAdmin ? t("set.role.admin") : session.isMember ? t("set.role.member") : t("set.role.none")}</dt>
               <dd>{t("home.role")}</dd>
             </div>
@@ -56,29 +56,29 @@ const IndexPage: React.FC<PageProps> = () => {
         </div>
       </div>
 
-      <h1 className="app-cards__heading">{t("nav.spaces")}</h1>
+      <h1 className="mk-cards__heading">{t("nav.spaces")}</h1>
 
-      {error && <p className="app-error" role="alert">{error}</p>}
-      {!spaces && !error && <p className="app-muted">{t("lib.loading")}</p>}
+      {error && <p className="mk-error" role="alert">{error}</p>}
+      {!spaces && !error && <p className="mk-muted">{t("lib.loading")}</p>}
 
       {spaces?.length === 0 && (
-        <div className="app-empty">
+        <div className="mk-empty">
           <p>{t("home.none")}</p>
-          <p className="app-muted">
+          <p className="mk-muted">
             {session.isOperator ? <>{t("home.none.operator")} <Link to="/settings/">{t("nav.settings")}</Link></> : t("home.none.member")}
           </p>
         </div>
       )}
 
       {spaces && spaces.length > 0 && (
-        <ul className="app-cards">
+        <ul className="mk-cards">
           {spaces.map((space) => (
             <li key={space.id}>
-              <a className="app-card" href={`/w/${space.id}/`}>
-                <span className="app-card__title">{space.kind === "private" ? "🔒 " : ""}{space.name}</span>
+              <a className="mk-card" href={`/w/${space.id}/`}>
+                <span className="mk-card__title">{space.kind === "private" ? "🔒 " : ""}{space.name}</span>
                 {/* The id, deliberately not shown. ADR-0003: never render an id
                     where a name belongs. */}
-                {tenants.length > 1 && space.tenantName && <span className="app-card__meta">{space.tenantName}</span>}
+                {tenants.length > 1 && space.tenantName && <span className="mk-card__meta">{space.tenantName}</span>}
               </a>
             </li>
           ))}
@@ -90,4 +90,4 @@ const IndexPage: React.FC<PageProps> = () => {
 
 export default IndexPage;
 
-export const Head: HeadFC = () => <title>Spaces · template.dlab5</title>;
+export const Head: HeadFC = () => <title>Spaces · maker-5.dlab5</title>;

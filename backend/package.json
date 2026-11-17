@@ -1,5 +1,5 @@
 {
-  "name": "@dlab5/app-backend",
+  "name": "@dlab5/maker-5-backend",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -37,5 +37,5 @@
   "engines": {
     "node": ">=22"
   },
-  "license": "GPL-3.0-or-later"
+  "license": "AGPL-3.0-or-later"
 }

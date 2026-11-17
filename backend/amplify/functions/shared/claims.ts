@@ -37,7 +37,7 @@ export function claimsOf(identity: unknown) {
 }
 
 /** Operators: run the platform, create tenants, read no tenant content. */
-export const ADMIN_GROUP = "app-admins";
+export const ADMIN_GROUP = "mk-admins";
 
 /** ADR-0005: a tenant's admins are the Cognito group named like its id … */
 export const TENANT = /^t-[23456789abcdefghjkmnpqrstuvwxyz]{10}$/;

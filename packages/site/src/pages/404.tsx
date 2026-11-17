@@ -13,4 +13,4 @@ const NotFoundPage: React.FC<PageProps> = () => (
 
 export default NotFoundPage;
 
-export const Head: HeadFC = () => <title>Not found · template.dlab5</title>;
+export const Head: HeadFC = () => <title>Not found · maker-5.dlab5</title>;

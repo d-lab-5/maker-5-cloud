@@ -222,8 +222,8 @@ for (const fn of [backend.edgeDeviceAuthz, backend.edgeToken, backend.edgeTokenR
 // the local dev server for a personal sandbox (it has no public site).
 // APP_LINK_URL overrides both.
 const LINK_URLS: Record<string, string> = {
-  main: "https://template.dlab5.net/link",
-  stage: "https://stage.template.dlab5.net/link",
+  main: "https://maker-5.cloud/link",
+  stage: "https://stage.maker-5.cloud/link",
 };
 backend.edgeDeviceAuthz.addEnvironment(
   "LINK_URL",
@@ -264,7 +264,7 @@ for (const fn of [backend.graphs.resources.lambda, backend.edgeDeviceApproval.re
 
 // The HTTP API. Paths are the wire contract; they do not move.
 const edgeApi = new HttpApi(edgeStack, "EdgeHttpApi", {
-  apiName: "app-edge-api",
+  apiName: "mk-edge-api",
   corsPreflight: {
     allowOrigins: ["*"],
     allowMethods: [CorsHttpMethod.POST],

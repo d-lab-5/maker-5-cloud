@@ -13,16 +13,16 @@ import { defineStorage } from "@aws-amplify/backend";
  * `cognito:groups` against the space and its tenant and hands back a
  * short-lived presigned URL. The browser never talks to S3 directly.
  *
- * Operators (app-admins) get no rule here either: they run the platform and
+ * Operators (mk-admins) get no rule here either: they run the platform and
  * read no tenant content (ADR-0005). An earlier version of this template gave
  * them a console-free escape hatch on all content; with tenants, that hatch
  * is exactly the access the tenancy model promises nobody has. ADR-0004.
  */
 export const storage = defineStorage({
-  name: "appStorage",
+  name: "maker5Storage",
   access: (allow) => ({
     "assets/*": [
-      allow.groups(["app-admins"]).to(["read", "write", "delete"]),
+      allow.groups(["mk-admins"]).to(["read", "write", "delete"]),
       allow.authenticated.to(["read"]),
     ],
   }),

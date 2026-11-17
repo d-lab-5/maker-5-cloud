@@ -1,8 +1,8 @@
 {
-  "name": "@dlab5/app-site",
+  "name": "@dlab5/maker-5-site",
   "version": "0.1.0",
   "private": true,
-  "license": "GPL-3.0-or-later",
+  "license": "AGPL-3.0-or-later",
   "scripts": {
     "develop": "gatsby develop -H 0.0.0.0",
     "build": "gatsby build",
@@ -10,8 +10,8 @@
     "clean": "gatsby clean"
   },
   "dependencies": {
-    "@dlab5/app-core": "^0.1.0",
-    "@dlab5/app-i18n": "^0.1.0",
+    "@dlab5/maker-5-core": "^0.1.0",
+    "@dlab5/maker-5-i18n": "^0.1.0",
     "aws-amplify": "^6.15.0",
     "gatsby": "^5.16.0",
     "graphql": "^16.14.2",

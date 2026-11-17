@@ -65,7 +65,7 @@ class Refused extends Error {}
 
 /**
  * Resolves the space and confirms the caller may touch it: a reader of the
- * space, or an admin of its tenant. Operators (app-admins) are NOT let in by
+ * space, or an admin of its tenant. Operators (mk-admins) are NOT let in by
  * being operators; tenant content is for the tenant (ADR-0005).
  *
  * Throws the SAME message whether the space is missing or merely forbidden.

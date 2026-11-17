@@ -8,7 +8,7 @@ import {
   signOut,
   type SignInOutput,
 } from "aws-amplify/auth";
-import { ADMIN_GROUP, tenantsOf, isMember } from "@dlab5/app-core";
+import { ADMIN_GROUP, tenantsOf, isMember } from "@dlab5/maker-5-core";
 import { GuestLanding } from "./GuestLanding";
 import { MfaSetup, TotpEnroll } from "./MfaSetup";
 import { useAccountLang, useT } from "../lib/i18n";
@@ -26,14 +26,14 @@ export interface Session {
   tenants: string[];
   /** A reader of a space or a tenant's admin: may see tenant content. */
   isMember: boolean;
-  /** An operator (app-admins): runs the platform, creates tenants; reads no content unless a member too. */
+  /** An operator (mk-admins): runs the platform, creates tenants; reads no content unless a member too. */
   isOperator: boolean;
   /** Two-step sign-in (TOTP) is on. Required for admins and operators (H-3). */
   mfa: boolean;
 }
 
 /** The name an authenticator app shows next to the code. rename.mjs rewrites it. */
-const TOTP_ISSUER = "template.dlab5";
+const TOTP_ISSUER = "maker-5.dlab5";
 
 const AuthContext = React.createContext<Session | null>(null);
 
@@ -134,9 +134,9 @@ function PasswordField({
   const { t } = useT();
 
   return (
-    <label className="app-field app-field--password" htmlFor={id}>
+    <label className="mk-field mk-field--password" htmlFor={id}>
       <span>{label}</span>
-      <span className="app-field__control">
+      <span className="mk-field__control">
         <input
           id={id}
           type={shown ? "text" : "password"}
@@ -147,7 +147,7 @@ function PasswordField({
         />
         <button
           type="button"
-          className="app-field__reveal"
+          className="mk-field__reveal"
           onClick={() => setShown((previous) => !previous)}
           aria-pressed={shown}
           aria-label={shown ? t("auth.hidepassword") : t("auth.showpassword")}
@@ -235,9 +235,9 @@ function SignInForm({ onSignedIn }: { onSignedIn: () => Promise<void> }) {
   if (step === "totpsetup" && setup) {
     return (
       <GuestLanding>
-        <div className="app-gate__card">
-          <h2 className="app-gate__title">{t("mfa.title")}</h2>
-          <p className="app-gate__subtitle">{t("mfa.required")}</p>
+        <div className="mk-gate__card">
+          <h2 className="mk-gate__title">{t("mfa.title")}</h2>
+          <p className="mk-gate__subtitle">{t("mfa.required")}</p>
           <TotpEnroll uri={setup.uri} secret={setup.secret} busy={busy} error={error}
             onCode={(c) => void run(() => confirmSignIn({ challengeResponse: c }))} />
         </div>
@@ -247,31 +247,31 @@ function SignInForm({ onSignedIn }: { onSignedIn: () => Promise<void> }) {
 
   return (
     <GuestLanding>
-      <form className="app-gate__card" onSubmit={submit}>
+      <form className="mk-gate__card" onSubmit={submit}>
         {/* h2, not h1: GuestLanding owns the page heading. A second h1 would
             leave the page with no single subject. */}
-        <h2 className="app-gate__title">{t("auth.signin")}</h2>
-        <p className="app-gate__subtitle">
+        <h2 className="mk-gate__title">{t("auth.signin")}</h2>
+        <p className="mk-gate__subtitle">
           {step === "newpassword" ? t("auth.subtitle.newpassword") : step === "totp" ? t("auth.subtitle.totp") : t("auth.subtitle")}
         </p>
 
         {step === "newpassword" ? (
           <PasswordField
-            id="app-new-password"
+            id="mk-new-password"
             label={t("auth.newpassword")}
             autoComplete="new-password"
             value={newPassword}
             onChange={setNewPassword}
           />
         ) : step === "totp" ? (
-          <label className="app-field">
+          <label className="mk-field">
             <span>{t("mfa.code")}</span>
             <input inputMode="numeric" autoComplete="one-time-code" pattern="[0-9 ]{6,8}" value={code}
               onChange={(e) => setCode(e.target.value)} required autoFocus />
           </label>
         ) : (
           <>
-            <label className="app-field">
+            <label className="mk-field">
               <span>{t("auth.email")}</span>
               <input
                 type="email"
@@ -282,7 +282,7 @@ function SignInForm({ onSignedIn }: { onSignedIn: () => Promise<void> }) {
               />
             </label>
             <PasswordField
-              id="app-password"
+              id="mk-password"
               label={t("auth.password")}
               autoComplete="current-password"
               value={password}
@@ -292,12 +292,12 @@ function SignInForm({ onSignedIn }: { onSignedIn: () => Promise<void> }) {
         )}
 
         {error && (
-          <p className="app-gate__error" role="alert">
+          <p className="mk-gate__error" role="alert">
             {error}
           </p>
         )}
 
-        <button className="app-button" type="submit" disabled={busy}>
+        <button className="mk-button" type="submit" disabled={busy}>
           {busy ? t("auth.signingin") : step === "newpassword" ? t("auth.setpassword") : step === "totp" ? t("auth.confirmcode") : t("auth.signin")}
         </button>
       </form>
@@ -310,11 +310,11 @@ function MfaRequired({ session, onDone }: { session: Session; onDone: () => void
   const { t } = useT();
   return (
     <GuestLanding>
-      <div className="app-gate__card">
-        <h2 className="app-gate__title">{t("mfa.title")}</h2>
-        <p className="app-gate__subtitle">{t("mfa.required")}</p>
+      <div className="mk-gate__card">
+        <h2 className="mk-gate__title">{t("mfa.title")}</h2>
+        <p className="mk-gate__subtitle">{t("mfa.required")}</p>
         <MfaSetup email={session.email} onDone={onDone} />
-        <button type="button" className="app-linkbutton" onClick={() => void signOutAndReload()}>{t("nav.signout")}</button>
+        <button type="button" className="mk-linkbutton" onClick={() => void signOutAndReload()}>{t("nav.signout")}</button>
       </div>
     </GuestLanding>
   );
@@ -323,10 +323,10 @@ function MfaRequired({ session, onDone }: { session: Session; onDone: () => void
 function Unconfigured() {
   const { t } = useT();
   return (
-    <main className="app-gate">
-      <div className="app-gate__card">
-        <h1 className="app-gate__title">{t("auth.unconfigured")}</h1>
-        <p className="app-gate__subtitle">
+    <main className="mk-gate">
+      <div className="mk-gate__card">
+        <h1 className="mk-gate__title">{t("auth.unconfigured")}</h1>
+        <p className="mk-gate__subtitle">
           This build has no <code>amplify_outputs.json</code>. Run{" "}
           <code>npm run backend:sandbox</code> then{" "}
           <code>npm run backend:sync-outputs</code>, or redeploy the branch so
@@ -380,7 +380,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
    * client against a blank frame from the server.
    */
   if (!isBrowser || !mounted) {
-    return <main className="app-gate" aria-busy="true" />;
+    return <main className="mk-gate" aria-busy="true" />;
   }
 
   if (!isConfigured()) return <Unconfigured />;
@@ -388,7 +388,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   // Render nothing rather than the app while we do not yet know: showing the
   // shell first and swapping it for a sign-in form is the flash of
   // authenticated content the gate exists to prevent.
-  if (state === "loading") return <main className="app-gate" aria-busy="true" />;
+  if (state === "loading") return <main className="mk-gate" aria-busy="true" />;
 
   if (state === "out" || !session) return <SignInForm onSignedIn={refresh} />;
 

@@ -81,7 +81,7 @@ const SpacePage: React.FC<PageProps> = ({ location }) => {
   if (state === "loading") {
     return (
       <Shell space={id ? { id, active: view } : undefined}>
-        <p className="app-muted">Loading…</p>
+        <p className="mk-muted">Loading…</p>
       </Shell>
     );
   }
@@ -90,14 +90,14 @@ const SpacePage: React.FC<PageProps> = ({ location }) => {
     return (
       <Shell>
         <h1>Not available</h1>
-        <div className="app-empty">
+        <div className="mk-empty">
           <p>No such space, or you do not have access to it.</p>
-          <p className="app-muted">
+          <p className="mk-muted">
             Access is granted by an admin of the space&rsquo;s tenant, in
             Settings: they add your account to the space&rsquo;s readers.
           </p>
           {error && (
-            <p className="app-error" role="alert">
+            <p className="mk-error" role="alert">
               {error}
             </p>
           )}
@@ -108,9 +108,9 @@ const SpacePage: React.FC<PageProps> = ({ location }) => {
 
   return (
     <Shell space={{ id, name: space.name, active: view }}>
-      <div className="app-pagehead">
+      <div className="mk-pagehead">
         <h1>{LABELS[view]}</h1>
-        <span className="app-muted">{space.tenantName ? `${space.tenantName} · ` : ""}{space.name}</span>
+        <span className="mk-muted">{space.tenantName ? `${space.tenantName} · ` : ""}{space.name}</span>
       </div>
       <ViewBody view={view} space={space} />
     </Shell>
@@ -135,19 +135,19 @@ function ViewBody({ view, space }: { view: View; space: Space }) {
   switch (view) {
     case "overview":
       return (
-        <div className="app-panel">
-          <h2 className="app-panel__title">This space at a glance</h2>
-          <dl className="app-stats">
-            <div className="app-stat">
+        <div className="mk-panel">
+          <h2 className="mk-panel__title">This space at a glance</h2>
+          <dl className="mk-stats">
+            <div className="mk-stat">
               <dt>{space.kind}</dt>
               <dd>Kind</dd>
             </div>
-            <div className="app-stat">
+            <div className="mk-stat">
               <dt>{space.tenantName ?? "—"}</dt>
               <dd>Tenant</dd>
             </div>
           </dl>
-          <p className="app-panel__hint">
+          <p className="mk-panel__hint">
             The space&rsquo;s object lives in S3 at <code>spaces/{space.id}/data.json</code>{" "}
             and is read through <code>loadObject()</code> in{" "}
             <code>src/lib/data.ts</code>, which returns the content and the ETag
@@ -160,9 +160,9 @@ function ViewBody({ view, space }: { view: View; space: Space }) {
 
     case "items":
       return (
-        <div className="app-panel">
-          <h2 className="app-panel__title">Whatever this app is about</h2>
-          <p className="app-panel__hint">
+        <div className="mk-panel">
+          <h2 className="mk-panel__title">Whatever this app is about</h2>
+          <p className="mk-panel__hint">
             The space&rsquo;s own content: the list, the board, the canvas.
             It comes from <code>loadObject()</code>, is edited in memory, and
             goes back through <code>saveObject(id, value, etag)</code>. Handle
@@ -175,11 +175,11 @@ function ViewBody({ view, space }: { view: View; space: Space }) {
 
     case "reports":
       return (
-        <div className="app-panel">
-          <h2 className="app-panel__title">Derived views</h2>
-          <p className="app-panel__hint">
+        <div className="mk-panel">
+          <h2 className="mk-panel__title">Derived views</h2>
+          <p className="mk-panel__hint">
             Anything computed from the space rather than stored in it.
-            Compute it in <code>@dlab5/app-core</code> rather than in the
+            Compute it in <code>@dlab5/maker-5-core</code> rather than in the
             component: it is then testable with <code>node --test</code>, and a
             future Lambda or CLI can produce the same answer.
           </p>
@@ -188,10 +188,10 @@ function ViewBody({ view, space }: { view: View; space: Space }) {
 
     case "import":
       return (
-        <div className="app-panel">
-          <h2 className="app-panel__title">Getting things in</h2>
-          <p className="app-panel__hint">
-            Parse in <code>@dlab5/app-core</code>, validate at the boundary with{" "}
+        <div className="mk-panel">
+          <h2 className="mk-panel__title">Getting things in</h2>
+          <p className="mk-panel__hint">
+            Parse in <code>@dlab5/maker-5-core</code>, validate at the boundary with{" "}
             <code>assertSpace</code>-style checks that report every problem
             at once, and only then write — a parser that reports one problem
             per attempt turns a bad file into a sequence of guesses.
@@ -201,9 +201,9 @@ function ViewBody({ view, space }: { view: View; space: Space }) {
 
     case "export":
       return (
-        <div className="app-panel">
-          <h2 className="app-panel__title">Getting things out</h2>
-          <p className="app-panel__hint">
+        <div className="mk-panel">
+          <h2 className="mk-panel__title">Getting things out</h2>
+          <p className="mk-panel__hint">
             A round trip that is only ever tested against itself proves nothing.
             Export, re-import under a fresh id, export THAT and compare byte for
             byte — going back out through storage is the point.
@@ -215,4 +215,4 @@ function ViewBody({ view, space }: { view: View; space: Space }) {
 
 export default SpacePage;
 
-export const Head: HeadFC = () => <title>Space · template.dlab5</title>;
+export const Head: HeadFC = () => <title>Space · maker-5.dlab5</title>;

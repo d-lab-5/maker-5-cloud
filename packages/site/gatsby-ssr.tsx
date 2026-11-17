@@ -20,7 +20,7 @@ export const onRenderBody: GatsbySSR["onRenderBody"] = ({
 }) => {
   // Cast: Gatsby types setHtmlAttributes against React's HTML props, which do
   // not include data-* even though the DOM and React both accept them.
-  setHtmlAttributes({ lang: "en", "data-app-theme": "dark" } as Record<
+  setHtmlAttributes({ lang: "en", "data-mk-theme": "dark" } as Record<
     string,
     string
   >);
@@ -30,15 +30,15 @@ export const onRenderBody: GatsbySSR["onRenderBody"] = ({
   // every size; the theme-colour tints mobile browser chrome to match the
   // palette the page is about to paint.
   setHeadComponents([
-    <link key="app-icon" rel="icon" href="/favicon.svg" type="image/svg+xml" />,
+    <link key="mk-icon" rel="icon" href="/favicon.svg" type="image/svg+xml" />,
     <meta
-      key="app-theme-light"
+      key="mk-theme-light"
       name="theme-color"
       content="#f1f5f9"
       media="(prefers-color-scheme: light)"
     />,
     <meta
-      key="app-theme-dark"
+      key="mk-theme-dark"
       name="theme-color"
       content="#0f172a"
       media="(prefers-color-scheme: dark)"
@@ -53,17 +53,17 @@ export const onRenderBody: GatsbySSR["onRenderBody"] = ({
    * chose light. It has to be inline and synchronous in <head>; a React effect
    * is by definition too late.
    *
-   * Emitting data-app-theme="dark" above means the server output and the
+   * Emitting data-mk-theme="dark" above means the server output and the
    * client's first render agree, so this script is the only thing that ever
    * changes it and hydration never sees a mismatch.
    */
   setPreBodyComponents([
     <script
-      key="app-theme"
+      key="mk-theme"
       dangerouslySetInnerHTML={{
         __html:
-          "try{var t=localStorage.getItem('app-theme');" +
-          "if(t==='light')document.documentElement.setAttribute('data-app-theme','light');}" +
+          "try{var t=localStorage.getItem('mk-theme');" +
+          "if(t==='light')document.documentElement.setAttribute('data-mk-theme','light');}" +
           "catch(e){}",
       }}
     />,

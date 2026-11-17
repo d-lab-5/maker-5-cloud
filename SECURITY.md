@@ -71,7 +71,7 @@ improves the experience of a legitimate user and stops nobody. In particular:
 ## The demo account
 
 `scripts/demo.py` creates `demo-user@example.com` with a password committed in
-plain text, and puts it in `app-admins`. That is deliberate and it is safe only
+plain text, and puts it in `mk-admins`. That is deliberate and it is safe only
 because of what a sandbox is: your own private deployment, in your own account,
 that nobody else can reach. It is not a shared secret, and there is nothing to
 leak — anyone reading the repository can see the password and still has no pool

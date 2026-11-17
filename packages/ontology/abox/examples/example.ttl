@@ -1,11 +1,26 @@
-@prefix app:    <https://template.dlab5.net/ontology#> .
+@prefix m5:     <https://maker-5.cloud/ontology#> .
 @prefix schema: <https://schema.org/> .
+@prefix prov:   <http://www.w3.org/ns/prov#> .
 
 # An example A-Box: fictional, like everything in this public repository.
 
-<https://template.dlab5.net/id/place/p-workshop> a app:Place ; schema:name "Workshop" .
+<https://maker-5.cloud/id/product/p-weather-box> a m5:Product ; schema:name "Weather box" .
 
-<https://template.dlab5.net/id/thing/t-printer> a app:Thing ;
-    schema:name "3D printer" ;
-    app:thingType app:Device ;
-    app:locatedIn <https://template.dlab5.net/id/place/p-workshop> .
+<https://maker-5.cloud/id/block/b-sensor-board> a m5:Block ;
+    schema:name "Sensor board" ;
+    m5:blockType m5:Electronic ;
+    m5:partOf <https://maker-5.cloud/id/product/p-weather-box> .
+
+<https://maker-5.cloud/id/module/m-firmware> a m5:SoftwareModule ;
+    schema:name "Sensor firmware" ;
+    m5:partOf <https://maker-5.cloud/id/product/p-weather-box> .
+
+<https://maker-5.cloud/id/interface/i-i2c> a m5:Interface ;
+    schema:name "I2C bus" ;
+    m5:connects <https://maker-5.cloud/id/block/b-sensor-board> , <https://maker-5.cloud/id/module/m-firmware> .
+
+<https://maker-5.cloud/id/proposal/pr-1> a m5:Proposal ;
+    schema:name "Add a humidity sensor" ;
+    m5:proposalState m5:Proposed ;
+    m5:concerns <https://maker-5.cloud/id/block/b-sensor-board> ;
+    prov:wasAttributedTo <https://maker-5.cloud/id/agent/a-design-agent> .

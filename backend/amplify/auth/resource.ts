@@ -12,7 +12,7 @@ import { defineAuth } from "@aws-amplify/backend";
  *
  * Only ONE static group is declared here:
  *
- *   - app-admins   Operators. They run the platform: create tenants, see
+ *   - mk-admins   Operators. They run the platform: create tenants, see
  *                  tenant names and edges, release edges. They read NO
  *                  tenant content by being operators (ADR-0005).
  *
@@ -37,7 +37,7 @@ export const auth = defineAuth({
           `An account has been created for you.\n\n` +
           `Username: ${user()}\n` +
           `Temporary password: ${code()}\n\n` +
-          `Sign in at https://template.dlab5.net/ — you will be asked to ` +
+          `Sign in at https://maker-5.cloud/ — you will be asked to ` +
           `choose a new password.`,
       },
     },
@@ -46,6 +46,6 @@ export const auth = defineAuth({
   // so members who only look are not asked; tenant admins and operators must
   // set it up (site: AuthGate; Lambdas: functions/shared/mfa.ts).
   multifactor: { mode: "OPTIONAL", totp: true },
-  groups: ["app-admins"],
+  groups: ["mk-admins"],
   accountRecovery: "EMAIL_ONLY",
 });

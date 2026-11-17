@@ -14,7 +14,7 @@ import { useT } from "../lib/i18n";
  * so nothing is injected as HTML and the CSP needs no exception.
  */
 
-const APP = "template.dlab5";   // the name an authenticator app shows; rename.mjs rewrites it
+const APP = "maker-5.dlab5";   // the name an authenticator app shows; rename.mjs rewrites it
 
 export function Qr({ text, size = 176 }: { text: string; size?: number }) {
   const q = qrcode(0, "M");
@@ -41,17 +41,17 @@ export function TotpEnroll({ uri, secret, busy, error, onCode }: {
   const { t } = useT();
   const [code, setCode] = React.useState("");
   return (
-    <form className="app-mfa" onSubmit={(e) => { e.preventDefault(); onCode(code.replace(/\s/g, "")); }}>
-      <p className="app-muted">{t("mfa.scan")}</p>
-      <div className="app-mfa__qr"><Qr text={uri} /></div>
-      <p className="app-muted">{t("mfa.key")} <code className="app-mfa__key">{grouped(secret)}</code></p>
-      <label className="app-field">
+    <form className="mk-mfa" onSubmit={(e) => { e.preventDefault(); onCode(code.replace(/\s/g, "")); }}>
+      <p className="mk-muted">{t("mfa.scan")}</p>
+      <div className="mk-mfa__qr"><Qr text={uri} /></div>
+      <p className="mk-muted">{t("mfa.key")} <code className="mk-mfa__key">{grouped(secret)}</code></p>
+      <label className="mk-field">
         <span>{t("mfa.code")}</span>
         <input inputMode="numeric" autoComplete="one-time-code" pattern="[0-9 ]{6,8}" value={code}
           onChange={(e) => setCode(e.target.value)} required />
       </label>
-      {error && <p className="app-gate__error" role="alert">{error}</p>}
-      <button className="app-button" type="submit" disabled={busy}>{busy ? "…" : t("mfa.enable")}</button>
+      {error && <p className="mk-gate__error" role="alert">{error}</p>}
+      <button className="mk-button" type="submit" disabled={busy}>{busy ? "…" : t("mfa.enable")}</button>
     </form>
   );
 }
@@ -78,6 +78,6 @@ export function MfaSetup({ email, onDone }: { email?: string; onDone: () => void
     } catch (e) { fail(e); setBusy(false); }
   };
 
-  if (!setup) return error ? <p className="app-gate__error" role="alert">{error}</p> : <p className="app-muted">…</p>;
+  if (!setup) return error ? <p className="mk-gate__error" role="alert">{error}</p> : <p className="mk-muted">…</p>;
   return <TotpEnroll uri={setup.uri} secret={setup.secret} busy={busy} error={error} onCode={confirm} />;
 }

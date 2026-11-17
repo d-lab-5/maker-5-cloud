@@ -1,7 +1,7 @@
 /**
  * The package's only entry point.
  *
- * packages/site imports from "@dlab5/app-core", never from a deep path into
+ * packages/site imports from "@dlab5/maker-5-core", never from a deep path into
  * dist/. Keeping one barrel means the internal file layout can change without
  * touching the site, and it is the list to read to see what this package is.
  */

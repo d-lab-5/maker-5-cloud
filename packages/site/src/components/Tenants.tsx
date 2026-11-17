@@ -20,7 +20,7 @@ import { useT } from "../lib/i18n";
  *
  *   TenantPanel     a tenant's admins: its admins, its spaces, who reads
  *                   each one, new private spaces
- *   OperatorPanel   operators (app-admins): create a tenant with its
+ *   OperatorPanel   operators (mk-admins): create a tenant with its
  *                   shared space and first admin
  *
  * Members are existing accounts, added by e-mail. Changes take effect at the
@@ -49,27 +49,27 @@ function Members({ group, what, onSelf }: { group: string; what: string; onSelf:
   const me = (session.email ?? "").toLowerCase();
 
   return (
-    <div className="app-members">
-      <ul className="app-members__list">
+    <div className="mk-members">
+      <ul className="mk-members__list">
         {list?.map((m) => (
-          <li key={m.email} className="app-chip">
+          <li key={m.email} className="mk-chip">
             {m.name ? `${m.name} · ` : ""}{m.email}
-            <button type="button" className="app-chip__x" disabled={busy} aria-label={t("hh.remove", { email: m.email, what })}
+            <button type="button" className="mk-chip__x" disabled={busy} aria-label={t("hh.remove", { email: m.email, what })}
               onClick={() => {
                 if (m.email.toLowerCase() === me && !window.confirm(t("hh.removeself", { what }))) return;
                 void run(() => removeMember(group, m.email), m.email.toLowerCase() === me);
               }}>×</button>
           </li>
         ))}
-        {list?.length === 0 && <li className="app-muted">{t("hh.nobody")}</li>}
-        {!list && !error && <li className="app-muted">…</li>}
+        {list?.length === 0 && <li className="mk-muted">{t("hh.nobody")}</li>}
+        {!list && !error && <li className="mk-muted">…</li>}
       </ul>
-      <form className="app-members__add" onSubmit={(e) => { e.preventDefault(); void run(() => addMember(group, email), email.trim().toLowerCase() === me); }}>
-        <input className="app-input" type="email" placeholder={t("hh.email")} value={email}
+      <form className="mk-members__add" onSubmit={(e) => { e.preventDefault(); void run(() => addMember(group, email), email.trim().toLowerCase() === me); }}>
+        <input className="mk-input" type="email" placeholder={t("hh.email")} value={email}
           onChange={(e) => setEmail(e.target.value)} aria-label={t("hh.addto", { what })} />
-        <button type="submit" className="app-button app-button--ghost" disabled={busy || !email.includes("@")}>{t("hh.add")}</button>
+        <button type="submit" className="mk-button mk-button--ghost" disabled={busy || !email.includes("@")}>{t("hh.add")}</button>
       </form>
-      {error && <p className="app-error" role="alert">{error}</p>}
+      {error && <p className="mk-error" role="alert">{error}</p>}
     </div>
   );
 }
@@ -80,11 +80,11 @@ function SiteCode({ code }: { code: string }) {
   const [copied, setCopied] = React.useState(false);
   if (!code) return null;
   return (
-    <details className="app-sitecode">
+    <details className="mk-sitecode">
       <summary>{t("hh.code")}</summary>
-      <p className="app-panel__hint">{t("hh.code.hint")}</p>
-      <code className="app-id">{code}</code>{" "}
-      <button type="button" className="app-linkbutton" onClick={() => {
+      <p className="mk-panel__hint">{t("hh.code.hint")}</p>
+      <code className="mk-id">{code}</code>{" "}
+      <button type="button" className="mk-linkbutton" onClick={() => {
         void navigator.clipboard?.writeText(code).then(() => setCopied(true)).catch(() => undefined);
       }}>{copied ? t("hh.code.copied") : t("hh.code.copy")}</button>
     </details>
@@ -128,37 +128,37 @@ export function TenantPanel() {
   return (
     <>
       {tenants.map((h) => (
-        <div className="app-panel" key={h.id}>
-          <h2 className="app-panel__title">
+        <div className="mk-panel" key={h.id}>
+          <h2 className="mk-panel__title">
             {t("hh.title", { name: h.name })}{" "}
-            <button type="button" className="app-linkbutton" onClick={() => void renameH(h)}>{t("hh.rename")}</button>
-            <span className="app-muted app-id" title={t("hh.id")}> {h.id}</span>
+            <button type="button" className="mk-linkbutton" onClick={() => void renameH(h)}>{t("hh.rename")}</button>
+            <span className="mk-muted mk-id" title={t("hh.id")}> {h.id}</span>
           </h2>
-          <p className="app-panel__hint">{t("hh.hint")}</p>
+          <p className="mk-panel__hint">{t("hh.hint")}</p>
           <SiteCode code={tenantCode(h, spaces)} />
-          <h3 className="app-panel__sub">{t("hh.admins")}</h3>
+          <h3 className="mk-panel__sub">{t("hh.admins")}</h3>
           <Members group={h.id} what={t("hh.adminsof", { name: h.name })} onSelf={() => setChangedSelf(true)} />
           {spaces.filter((v) => v.tenantId === h.id).map((v) => (
-            <section key={v.id} className="app-space">
-              <h3 className="app-panel__sub">
+            <section key={v.id} className="mk-space">
+              <h3 className="mk-panel__sub">
                 {v.kind === "private" ? "🔒 " : ""}{v.name}
-                <span className="app-muted"> · {v.kind === "shared" ? t("hh.sharedspace") : t("hh.privatespace")}</span>
-                {" "}<button type="button" className="app-linkbutton" onClick={() => void rename(v)}>{t("hh.rename")}</button>
+                <span className="mk-muted"> · {v.kind === "shared" ? t("hh.sharedspace") : t("hh.privatespace")}</span>
+                {" "}<button type="button" className="mk-linkbutton" onClick={() => void rename(v)}>{t("hh.rename")}</button>
               </h3>
               <Members group={v.id} what={t("hh.thespace", { name: v.name })} onSelf={() => setChangedSelf(true)} />
             </section>
           ))}
-          <form className="app-members__add" onSubmit={(e) => { e.preventDefault(); void add(h.id); }}>
-            <input className="app-input" placeholder={t("hh.newspace")} value={newSpace[h.id] ?? ""}
+          <form className="mk-members__add" onSubmit={(e) => { e.preventDefault(); void add(h.id); }}>
+            <input className="mk-input" placeholder={t("hh.newspace")} value={newSpace[h.id] ?? ""}
               onChange={(e) => setNewSpace({ ...newSpace, [h.id]: e.target.value })} aria-label={t("hh.newspace.name")} />
-            <button type="submit" className="app-button app-button--ghost" disabled={!(newSpace[h.id] ?? "").trim()}>{t("hh.createspace")}</button>
+            <button type="submit" className="mk-button mk-button--ghost" disabled={!(newSpace[h.id] ?? "").trim()}>{t("hh.createspace")}</button>
           </form>
         </div>
       ))}
-      {error && <p className="app-error" role="alert">{error}</p>}
+      {error && <p className="mk-error" role="alert">{error}</p>}
       {changedSelf && (
-        <p className="app-panel__hint">
-          {t("hh.changedself")} <button type="button" className="app-linkbutton" onClick={() => void refreshGroups()}>{t("hh.refreshnow")}</button>{" "}
+        <p className="mk-panel__hint">
+          {t("hh.changedself")} <button type="button" className="mk-linkbutton" onClick={() => void refreshGroups()}>{t("hh.refreshnow")}</button>{" "}
           {t("hh.tosee")}
         </p>
       )}
@@ -184,28 +184,28 @@ export function OperatorPanel() {
   };
 
   return (
-    <div className="app-panel">
-      <h2 className="app-panel__title">{t("op.title")}</h2>
-      <p className="app-panel__hint">{t("op.hint")}</p>
-      <form className="app-form" onSubmit={(e) => { e.preventDefault(); void create(); }}>
-        <input className="app-input" placeholder={t("op.name")} value={name} onChange={(e) => setName(e.target.value)} />
-        <input className="app-input" type="email" placeholder={t("op.admin")} value={admin}
+    <div className="mk-panel">
+      <h2 className="mk-panel__title">{t("op.title")}</h2>
+      <p className="mk-panel__hint">{t("op.hint")}</p>
+      <form className="mk-form" onSubmit={(e) => { e.preventDefault(); void create(); }}>
+        <input className="mk-input" placeholder={t("op.name")} value={name} onChange={(e) => setName(e.target.value)} />
+        <input className="mk-input" type="email" placeholder={t("op.admin")} value={admin}
           onChange={(e) => setAdmin(e.target.value)} />
-        <input className="app-input" placeholder={t("op.sameas")} value={sameAs} aria-label={t("op.sameas")}
+        <input className="mk-input" placeholder={t("op.sameas")} value={sameAs} aria-label={t("op.sameas")}
           onChange={(e) => setSameAs(e.target.value)} spellCheck={false} autoComplete="off" />
-        <span className="app-muted">{t("op.sameas.hint")}</span>
-        <button type="submit" className="app-button" disabled={busy || !name.trim() || !admin.includes("@")}>
+        <span className="mk-muted">{t("op.sameas.hint")}</span>
+        <button type="submit" className="mk-button" disabled={busy || !name.trim() || !admin.includes("@")}>
           {busy ? t("op.creating") : t("op.create")}
         </button>
         {!busy && (!name.trim() || !admin.includes("@")) && (
-          <span className="app-muted">{t("op.needs")}</span>
+          <span className="mk-muted">{t("op.needs")}</span>
         )}
       </form>
-      {error && <p className="app-error" role="alert">{error}</p>}
+      {error && <p className="mk-error" role="alert">{error}</p>}
       {made && (
-        <p className="app-ok" role="status">
+        <p className="mk-ok" role="status">
           {t("op.ready", { name: made.name })}{" "}
-          <button type="button" className="app-linkbutton" onClick={() => void refreshGroups()}>{t("op.refresh")}</button> {t("op.tosee")}
+          <button type="button" className="mk-linkbutton" onClick={() => void refreshGroups()}>{t("op.refresh")}</button> {t("op.tosee")}
         </p>
       )}
     </div>

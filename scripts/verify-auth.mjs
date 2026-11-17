@@ -12,7 +12,7 @@
  * that proves the gate agrees with AWS.
  *
  * Usage:
- *   APP_USER=someone@example.com APP_PASSWORD='...' \
+ *   MK_USER=someone@example.com MK_PASSWORD='...' \
  *     node scripts/verify-auth.mjs [--new-password '...']
  *
  * Pass --new-password when the account is still in FORCE_CHANGE_PASSWORD, i.e.
@@ -69,14 +69,14 @@ cognitoUserPoolsTokenProvider.setKeyValueStorage({
   clear: async () => void mem.clear(),
 });
 
-const username = process.env.APP_USER;
-const password = process.env.APP_PASSWORD;
+const username = process.env.MK_USER;
+const password = process.env.MK_PASSWORD;
 const newPasswordIdx = process.argv.indexOf("--new-password");
 const newPassword =
   newPasswordIdx > -1 ? process.argv[newPasswordIdx + 1] : undefined;
 
 if (!username || !password) {
-  console.error("\n  set APP_USER and APP_PASSWORD (see .env.example)\n");
+  console.error("\n  set MK_USER and MK_PASSWORD (see .env.example)\n");
   process.exit(2);
 }
 
@@ -112,8 +112,8 @@ check(
 );
 check(!outputs.data?.api_key, "data API has no API key");
 check(
-  (outputs.auth?.groups ?? []).some((g) => "app-admins" in g),
-  "app-admins group is declared"
+  (outputs.auth?.groups ?? []).some((g) => "mk-admins" in g),
+  "mk-admins group is declared"
 );
 
 /* -- the sign-in path ------------------------------------------------------ */
@@ -138,11 +138,11 @@ function diagnose(err) {
                                       for a deployed branch`;
   }
   if (/NotAuthorized/.test(name) || /Incorrect username or password/i.test(message)) {
-    return "APP_USER / APP_PASSWORD were rejected by this pool.";
+    return "MK_USER / MK_PASSWORD were rejected by this pool.";
   }
   if (/UserNotFound/.test(name)) {
     return `No such user in this pool. Accounts are admin-created (ADR-0002):
-  make one in the Cognito console and add it to app-admins.`;
+  make one in the Cognito console and add it to mk-admins.`;
   }
   if (/PasswordResetRequired|NewPasswordRequired/.test(name)) {
     return "The account needs a new password. Re-run with --new-password '…'.";
@@ -173,7 +173,7 @@ const payload = session.tokens?.idToken?.payload ?? {};
 const groups = payload["cognito:groups"] ?? [];
 
 check(Boolean(session.tokens?.idToken), "an ID token is issued");
-// Not asserted to contain app-admins: this has to pass for an ordinary member
+// Not asserted to contain mk-admins: this has to pass for an ordinary member
 // too, and a check that only a privileged account can satisfy is one nobody
 // runs. What matters is that the claim REACHES the client at all — its
 // absence is what breaks the rail, the switcher and every group check.

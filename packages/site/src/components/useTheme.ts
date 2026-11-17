@@ -3,7 +3,7 @@ import * as React from "react";
 /**
  * Light/dark, persisted.
  *
- * The value is written to `<html data-app-theme>` rather than kept only in
+ * The value is written to `<html data-mk-theme>` rather than kept only in
  * React state, so the tokens in tokens.css apply to EVERYTHING including
  * portals and anything rendered outside the React tree — an embedded editor or
  * charting library injects its own chrome, and a custom property on the root
@@ -17,11 +17,11 @@ import * as React from "react";
 
 export type Theme = "dark" | "light";
 
-export const THEME_KEY = "app-theme";
+export const THEME_KEY = "mk-theme";
 
 function current(): Theme {
   if (typeof document === "undefined") return "dark";
-  return document.documentElement.getAttribute("data-app-theme") === "light"
+  return document.documentElement.getAttribute("data-mk-theme") === "light"
     ? "light"
     : "dark";
 }
@@ -39,7 +39,7 @@ export function useTheme(): [Theme, () => void] {
   const toggle = React.useCallback(() => {
     setTheme((previous) => {
       const next: Theme = previous === "dark" ? "light" : "dark";
-      document.documentElement.setAttribute("data-app-theme", next);
+      document.documentElement.setAttribute("data-mk-theme", next);
       try {
         window.localStorage.setItem(THEME_KEY, next);
       } catch {

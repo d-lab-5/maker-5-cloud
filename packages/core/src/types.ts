@@ -61,7 +61,7 @@ export interface DeviceCodeInfo {
 }
 
 /** Operators. Change it here and in auth/resource.ts together. */
-export const ADMIN_GROUP = "app-admins";
+export const ADMIN_GROUP = "mk-admins";
 
 /** ADR-0005: a tenant's admins and a space's readers are groups named like their ids. */
 export const TENANT_ID = /^t-[23456789abcdefghjkmnpqrstuvwxyz]{10}$/;

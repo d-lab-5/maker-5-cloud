@@ -13,7 +13,7 @@ export const MAX_TTL_BYTES = 350_000;
 export const GRAPH_NAME = /^[a-z][a-z0-9-]{0,39}$/;
 
 /** A-Boxes describe things, they do not change the vocabulary. */
-const ID_SPACE = "https://template.dlab5.net/id/";
+const ID_SPACE = "https://maker-5.cloud/id/";
 
 const parse = (ttl: string) => new N3.Parser().parse(ttl);
 

@@ -7,11 +7,11 @@ import type { GatsbyConfig } from "gatsby";
  * There is no sitemap or robots plugin here, and that is deliberate: every
  * route sits behind Cognito, so there is nothing for a crawler to index.
  */
-const siteUrl = process.env.GATSBY_SITE_URL || "https://template.dlab5.net";
+const siteUrl = process.env.GATSBY_SITE_URL || "https://maker-5.cloud";
 
 const config: GatsbyConfig = {
   siteMetadata: {
-    title: "D-LAB-5 Template",
+    title: "Maker-5",
     description:
       "Gatsby 5 frontend and Amplify Gen 2 backend, behind one Cognito gate.",
     siteUrl,

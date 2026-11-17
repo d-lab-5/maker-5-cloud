@@ -7,7 +7,7 @@
   "about.install": "Installer un edge sur un autre ordinateur",
   "about.lede": "Les espaces d'une organisation, ce qu'elle en sait, et les edges qui y sont associés.",
   "about.licence": "Licence",
-  "about.licence.hint": "Construit à partir de template-dlab5-cloud, logiciel GPL-3.0 de D-LAB-5.",
+  "about.licence.hint": "Construit à partir de maker-5-cloud, logiciel AGPL-3.0 de D-LAB-5.",
   "about.minedge": "Version minimale de l’edge",
   "about.title": "À propos",
   "about.version": "Version",

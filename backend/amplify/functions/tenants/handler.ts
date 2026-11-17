@@ -3,7 +3,7 @@
 // each. This is the only writer of both. (The models' own generated
 // createTenant/createSpace are refused by their rules: nobody may write.)
 //
-//   addTenant(name, adminEmail, sameAs?)                 operators (app-admins)
+//   addTenant(name, adminEmail, sameAs?)                 operators (mk-admins)
 //                                                        sameAs: another site's tenant code,
 //                                                        so both use the same ids (see sameAsCode)
 //   addSpace(tenantId, name)                          that tenant's admins

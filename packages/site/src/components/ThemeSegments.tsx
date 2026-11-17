@@ -17,12 +17,12 @@ export function ThemeSegments() {
   const [theme, toggle] = useTheme();
 
   return (
-    <div className="app-seg" role="group" aria-label="Appearance">
+    <div className="mk-seg" role="group" aria-label="Appearance">
       {(["dark", "light"] as const).map((value) => (
         <button
           key={value}
           type="button"
-          className={`app-seg__option${theme === value ? " app-seg__option--on" : ""}`}
+          className={`mk-seg__option${theme === value ? " mk-seg__option--on" : ""}`}
           aria-pressed={theme === value}
           onClick={() => {
             if (theme !== value) toggle();
