@@ -7,6 +7,12 @@ It was made from `template-dlab5-cloud`, which is GPL-3.0-or-later. GPLv3
 section 13 lets GPLv3 code be combined with AGPLv3 code, and D-LAB-5 holds the
 copyright of both, so the product is under the AGPL as a whole.
 
+## The ontology
+
+`packages/ontology` (the T-Box, the SHACL shapes and the example A-Box) is
+**CC BY 4.0**, see `packages/ontology/LICENSE`, so that anyone can reuse the
+vocabulary. A copy is published in maker-5-shared.
+
 ## Included
 
 Nothing third-party is vendored into this repository.

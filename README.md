@@ -128,3 +128,5 @@ DynamoDB · S3 · API Gateway (HTTP) · RDF/SHACL · npm workspaces · Node 22.
 **AGPL-3.0-or-later**: see [LICENSE](LICENSE) and [COPYRIGHT](COPYRIGHT). If
 you run a modified version of this portal as a network service, you must offer
 its source to the people who use it.
+
+`packages/ontology` is CC BY 4.0 (see its LICENSE), so that anyone can reuse the vocabulary.

@@ -1,10 +1,14 @@
 {
   "name": "@dlab5/maker-5-ontology",
   "version": "0.1.0",
+  "license": "CC-BY-4.0",
   "private": true,
   "description": "The T-Box, SKOS concept schemes (EN master, DE, FR) and SHACL shapes each space's A-Box is checked against",
   "type": "module",
-  "files": ["tbox", "shapes"],
+  "files": [
+    "tbox",
+    "shapes"
+  ],
   "scripts": {
     "test": "node --test __tests__/*.test.mjs"
   },
