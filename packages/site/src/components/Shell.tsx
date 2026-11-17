@@ -65,6 +65,18 @@ export function railItems(id: string): RailItem[] {
       icon: icon(<path d="M4 6h16M4 12h11M4 18h7" />),
     },
     {
+      key: "materials",
+      label: "Materials",
+      href: `/w/${id}/materials/`,
+      // a box with a part on it
+      icon: icon(
+        <>
+          <path d="M3 8l9-5 9 5v8l-9 5-9-5z" />
+          <path d="M3 8l9 5 9-5M12 13v8" />
+        </>
+      ),
+    },
+    {
       key: "items",
       label: "Items",
       href: `/w/${id}/items/`,
@@ -306,6 +318,23 @@ export function Shell({ children, space, active, title }: ShellProps) {
           <ThemeSegments />
           <LangPicker className="mk-select mk-select--small" />
           <HelpSwitch />
+        </RailSection>
+
+        <RailSection label={t("shell.stock")}>
+          <ul className="mk-rail__items">
+            <li>
+              <Link className={`mk-rail__item${active === "materials" ? " mk-rail__item--on" : ""}`} to="/materials/">
+                {icon(<><path d="M3 8l9-5 9 5v8l-9 5-9-5z" /><path d="M3 8l9 5 9-5M12 13v8" /></>)}
+                {t("nav.materials")}
+              </Link>
+            </li>
+            <li>
+              <Link className={`mk-rail__item${active === "scan" ? " mk-rail__item--on" : ""}`} to="/scan/">
+                {icon(<><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" /><path d="M7 12h10" /></>)}
+                {t("nav.scan")}
+              </Link>
+            </li>
+          </ul>
         </RailSection>
 
         <RailSection label={t("shell.account")}>

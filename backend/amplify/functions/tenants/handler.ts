@@ -11,13 +11,21 @@
 //   renameSpace(spaceId, name)                           its tenant's admins
 //   groupMembers(group) / addMember / removeMember       the tenant's admins,
 //                                                        for its own group and its spaces
+//   resendInvite(email)                                  an admin of a tenant the person is in
+//   allPeople / setUserEnabled(email, enabled)           operators
 //
-// Members are existing accounts, found by e-mail: signup stays admin-only
-// (ADR-0002). A tenant always keeps at least one admin.
+// Accounts are by invitation only (ADR-0002; ADR-0007 in maker-5-shared):
+// adding an e-mail that has no account yet creates it (AdminCreateUser), and
+// Cognito sends the invitation set up in auth/resource.ts. A tenant always
+// keeps at least one admin.
 
 import type { AppSyncResolverEvent } from "aws-lambda";
 import {
   AdminAddUserToGroupCommand,
+  AdminCreateUserCommand,
+  AdminDisableUserCommand,
+  AdminEnableUserCommand,
+  AdminListGroupsForUserCommand,
   AdminRemoveUserFromGroupCommand,
   CognitoIdentityProviderClient,
   CreateGroupCommand,
@@ -35,7 +43,7 @@ const SPACE_TABLE = () => process.env.SPACE_TABLE_NAME!;
 const TENANT_TABLE = () => process.env.TENANT_TABLE_NAME!;
 
 /** A refusal the caller may see. */
-class Refused extends Error {}
+export class Refused extends Error {}
 
 const clean = (name: unknown, what: string) => {
   const n = String(name ?? "").split(/\s+/).filter(Boolean).join(" ").slice(0, 80);
@@ -43,15 +51,70 @@ const clean = (name: unknown, what: string) => {
   return n;
 };
 const attr = (u: UserType, name: string) => u.Attributes?.find((a) => a.Name === name)?.Value;
-const member = (u: UserType) => ({ email: attr(u, "email") ?? u.Username ?? "?", name: attr(u, "name") ?? null });
+
+/** invited: the account exists but its temporary password was never changed. */
+export const statusOf = (u: UserType) =>
+  u.Enabled === false ? "disabled" : u.UserStatus === "FORCE_CHANGE_PASSWORD" ? "invited" : "active";
+export const member = (u: UserType) => ({
+  email: attr(u, "email") ?? u.Username ?? "?", name: attr(u, "name") ?? null, status: statusOf(u),
+});
+
+export function cleanEmail(email: unknown): string {
+  const e = String(email ?? "").trim().toLowerCase();
+  if (!/^[^\s"@]+@[^\s"@]+\.[^\s"@]+$/.test(e) || e.length > 254) throw new Refused("That is not an e-mail address.");
+  return e;
+}
+
+type Send = (cmd: unknown) => Promise<any>;   // eslint-disable-line @typescript-eslint/no-explicit-any
+const send: Send = (cmd) => cognito.send(cmd as never);
+
+async function findUser(pool: string, email: string, via: Send = send): Promise<UserType | null> {
+  const r = await via(new ListUsersCommand({ UserPoolId: pool, Filter: `email = "${cleanEmail(email)}"`, Limit: 2 }));
+  return r.Users?.[0]?.Username ? r.Users[0] : null;
+}
 
 async function userByEmail(pool: string, email: string): Promise<UserType> {
-  const e = String(email || "").trim().toLowerCase();
-  if (!/^[^\s"@]+@[^\s"@]+$/.test(e)) throw new Refused("That is not an e-mail address.");
-  const r = await cognito.send(new ListUsersCommand({ UserPoolId: pool, Filter: `email = "${e}"`, Limit: 2 }));
-  const u = r.Users?.[0];
-  if (!u?.Username) throw new Refused(`No account for ${e}. An operator creates accounts first.`);
+  const u = await findUser(pool, email);
+  if (!u) throw new Refused(`No account for ${cleanEmail(email)}.`);
   return u;
+}
+
+/**
+ * The account for this e-mail, made and invited when there is none
+ * (ADR-0007). The e-mail is marked verified: whoever invites vouches for it,
+ * and the invitation itself proves it on first sign-in.
+ */
+export async function ensureAccount(pool: string, email: string, via: Send = send): Promise<{ user: UserType; invited: boolean }> {
+  const e = cleanEmail(email);
+  const found = await findUser(pool, e, via);
+  if (found) return { user: found, invited: false };
+  const r = await via(new AdminCreateUserCommand({
+    UserPoolId: pool, Username: e, DesiredDeliveryMediums: ["EMAIL"],
+    UserAttributes: [{ Name: "email", Value: e }, { Name: "email_verified", Value: "true" }],
+  }));
+  return { user: r.User as UserType, invited: true };
+}
+
+async function everyone(pool: string) {
+  const out: UserType[] = [];
+  let token: string | undefined;
+  do {
+    const r = await cognito.send(new ListUsersCommand({ UserPoolId: pool, PaginationToken: token, Limit: 60 }));
+    out.push(...(r.Users ?? []));
+    token = r.PaginationToken;
+  } while (token);
+  return out;
+}
+
+async function groupsOfUser(pool: string, username: string): Promise<string[]> {
+  const out: string[] = [];
+  let next: string | undefined;
+  do {
+    const r = await cognito.send(new AdminListGroupsForUserCommand({ UserPoolId: pool, Username: username, NextToken: next }));
+    out.push(...(r.Groups ?? []).map((g) => g.GroupName ?? ""));
+    next = r.NextToken;
+  } while (next);
+  return out;
 }
 
 async function members(pool: string, group: string) {
@@ -201,7 +264,9 @@ export const handler = async (event: AppSyncResolverEvent<Args>) => {
       const hid = await tenantOfGroup(group);
       if (!isAdminOf(groups, hid)) throw new Refused("Only the tenant's admins see and change who is in it.");
       if (field !== "groupMembers") {
-        const u = await userByEmail(userPoolId, String(a.email));
+        const u = field === "addMember"
+          ? (await ensureAccount(userPoolId, String(a.email))).user
+          : await userByEmail(userPoolId, String(a.email));
         if (field === "addMember") {
           await cognito.send(new AdminAddUserToGroupCommand({ UserPoolId: userPoolId, GroupName: group, Username: u.Username }));
         } else {
@@ -212,6 +277,38 @@ export const handler = async (event: AppSyncResolverEvent<Args>) => {
         }
       }
       return (await members(userPoolId, group)).map(member).sort((x, y) => x.email.localeCompare(y.email));
+    }
+
+    if (field === "resendInvite") {
+      const u = await userByEmail(userPoolId, String(a.email));
+      if (!groups.includes(ADMIN_GROUP)) {
+        const theirs = await groupsOfUser(userPoolId, u.Username!);
+        const tenantsOfThem = new Set<string>();
+        for (const g of theirs) {
+          if (TENANT.test(g)) tenantsOfThem.add(g);
+          else if (SPACE.test(g)) { const v = await getSpace(g); if (v) tenantsOfThem.add(v.tenantId); }
+        }
+        if (![...tenantsOfThem].some((h) => isAdminOf(groups, h))) {
+          throw new Refused("Only an admin of a tenant this person is in sends the invitation again.");
+        }
+      }
+      if (statusOf(u) !== "invited") throw new Refused("This person has signed in already; there is no invitation to send.");
+      await cognito.send(new AdminCreateUserCommand({
+        UserPoolId: userPoolId, Username: u.Username, MessageAction: "RESEND", DesiredDeliveryMediums: ["EMAIL"],
+      }));
+      return member(u);
+    }
+
+    if (field === "allPeople" || field === "setUserEnabled") {
+      if (!groups.includes(ADMIN_GROUP)) throw new Refused("Only operators see and change every account.");
+      if (field === "setUserEnabled") {
+        const u = await userByEmail(userPoolId, String(a.email));
+        if (u.Username === username) throw new Refused("You cannot disable your own account.");
+        await cognito.send(a.enabled
+          ? new AdminEnableUserCommand({ UserPoolId: userPoolId, Username: u.Username })
+          : new AdminDisableUserCommand({ UserPoolId: userPoolId, Username: u.Username }));
+      }
+      return (await everyone(userPoolId)).map(member).sort((x, y) => x.email.localeCompare(y.email));
     }
 
     throw new Error(`Unsupported field: ${field}`);

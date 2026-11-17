@@ -43,3 +43,13 @@ test("a block without a name, or with a kind from no scheme, does not", async ()
   assert.equal((await validate(`${P}<https://maker-5.cloud/id/block/b-1> a m5:Block .`)).conforms, false);
   assert.equal((await validate(`${P}<https://maker-5.cloud/id/block/b-1> a m5:Block ; schema:name "x" ; m5:blockType m5:Nonsense .`)).conforms, false);
 });
+
+test("a block names one article of the stock, with a whole quantity", async () => {
+  const A = "https://maker-5.cloud/id/article/a-abcdefghjk";
+  const ok = `${P}<https://maker-5.cloud/id/block/b-1> a m5:Block ; schema:name "Controller" ; m5:usesArticle <${A}> ; m5:quantity 2 .`;
+  assert.ok((await validate(ok)).conforms);
+  for (const bad of [`m5:usesArticle <https://example.org/a-1>`, `m5:usesArticle "a-abcdefghjk"`, `m5:usesArticle <${A}> ; m5:quantity 0`,
+                     `m5:usesArticle <${A}> ; m5:quantity "two"`]) {
+    assert.equal((await validate(`${P}<https://maker-5.cloud/id/block/b-1> a m5:Block ; schema:name "x" ; ${bad} .`)).conforms, false, bad);
+  }
+});

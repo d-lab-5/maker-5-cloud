@@ -1123,3 +1123,62 @@ a {
 .mk-install__manual summary { cursor: pointer; font-size: 0.875rem; color: var(--mk-text-muted); }
 
 .mk-install__cmd { font-family: var(--mk-font-mono); font-size: 0.75rem; background: var(--mk-bg-sunken); padding: var(--mk-space-2) var(--mk-space-3); border-radius: var(--mk-radius-sm); overflow-x: auto; }
+
+/* ---- Material: stock, cards, labels (ADR-0008 to ADR-0010) ------------- */
+
+.mk-toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0.5rem 0; }
+.mk-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0 0.5rem; }
+.mk-num { text-align: right; font-variant-numeric: tabular-nums; }
+.mk-input--num { width: 6.5rem; }
+.mk-pill {
+  display: inline-block; margin-left: 0.4rem; padding: 0 0.45rem; border-radius: 999px;
+  font-size: 0.75rem; border: 1px solid var(--mk-border-strong); color: var(--mk-text-muted);
+}
+.mk-pill--warn { border-color: var(--mk-warning); color: var(--mk-warning); }
+.mk-stock tbody tr { cursor: pointer; }
+.mk-stock tbody tr:hover, .mk-row--on { background: var(--mk-surface-raised); }
+.mk-row--low td:last-child { color: var(--mk-warning); }
+.mk-list { margin: 0.25rem 0; padding-left: 1.1rem; }
+.mk-list li { margin: 0.2rem 0; }
+.mk-history { margin-top: 0.75rem; }
+.mk-history summary { cursor: pointer; color: var(--mk-text-muted); }
+.mk-articleform { margin: 0.75rem 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: 0.5rem; }
+.mk-take { margin-top: 1rem; border-top: 1px solid var(--mk-border); padding-top: 0.5rem; }
+.mk-scanner { display: grid; gap: 0.5rem; margin: 0.75rem 0; }
+.mk-scanner__video { width: 100%; max-width: 28rem; border-radius: 10px; background: #000; }
+.mk-card .mk-facts { margin: 0.75rem 0; }
+.mk-card h1 { margin: 0.2rem 0 0.4rem; }
+.mk-card .mk-chip { margin: 0 0.3rem 0.3rem 0; text-decoration: none; }
+
+/* The label sheet: an overlay on screen; on paper only the sheet, at size. */
+.mk-labels {
+  position: fixed; inset: 0; z-index: 50; overflow: auto;
+  background: var(--mk-bg); padding: 1rem;
+}
+.mk-labels__bar { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin-bottom: 1rem; }
+.mk-sheet {
+  width: 210mm; min-height: 297mm; box-sizing: border-box; padding: 8mm;
+  background: #fff; color: #000; display: grid; align-content: start;
+}
+.mk-sheet--tiny { grid-template-columns: repeat(auto-fill, 14mm); grid-auto-rows: 17mm; gap: 2mm; }
+.mk-sheet--tag { grid-template-columns: repeat(auto-fill, 31mm); grid-auto-rows: 31mm; gap: 2mm; }
+.mk-sheet--article { grid-template-columns: repeat(3, 70mm); grid-auto-rows: 37mm; padding: 0; gap: 0; }
+.mk-label { display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; font-family: "IBM Plex Mono", ui-monospace, monospace; }
+.mk-sheet--article .mk-label { flex-direction: row; gap: 3mm; padding: 3mm; justify-content: flex-start; }
+.mk-label__qr svg { display: block; width: 100%; height: 100%; }
+.mk-label__text { display: flex; flex-direction: column; align-items: center; line-height: 1.15; }
+.mk-sheet--article .mk-label__text { align-items: flex-start; }
+.mk-label__code { font-size: 6pt; letter-spacing: 0.04em; }
+.mk-sheet--tag .mk-label__code, .mk-sheet--article .mk-label__code { font-size: 8pt; }
+.mk-label__title { font-family: "IBM Plex Sans", system-ui, sans-serif; font-size: 7pt; text-align: center; }
+.mk-sheet--article .mk-label__title { font-size: 10pt; font-weight: 600; text-align: left; }
+.mk-label__sub { font-size: 7pt; color: #333; }
+
+@media print {
+  @page { size: A4; margin: 0; }
+  body.mk-labels-open * { visibility: hidden; }
+  body.mk-labels-open .mk-sheet, body.mk-labels-open .mk-sheet * { visibility: visible; }
+  body.mk-labels-open .mk-labels { position: absolute; inset: 0; padding: 0; background: #fff; overflow: visible; }
+  body.mk-labels-open .mk-sheet { position: absolute; left: 0; top: 0; }
+  .mk-noprint { display: none !important; }
+}

@@ -2,7 +2,10 @@ import * as React from "react";
 import { refreshGroups, useSession } from "./AuthGate";
 import {
   addMember,
+  allPeople,
   createTenant,
+  resendInvite,
+  setUserEnabled,
   createSpace,
   groupMembers,
   tenantCode,
@@ -23,8 +26,9 @@ import { useT } from "../lib/i18n";
  *   OperatorPanel   operators (mk-admins): create a tenant with its
  *                   shared space and first admin
  *
- * Members are existing accounts, added by e-mail. Changes take effect at the
- * member's next sign-in (or token refresh, within the hour).
+ * Accounts are by invitation (ADR-0007): adding an e-mail without an account
+ * invites it. Changes take effect at the member's next sign-in (or token
+ * refresh, within the hour).
  */
 
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
@@ -37,12 +41,19 @@ function Members({ group, what, onSelf }: { group: string; what: string; onSelf:
   const [email, setEmail] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [note, setNote] = React.useState<string | null>(null);
 
   React.useEffect(() => { groupMembers(group).then(setList).catch((e) => setError(message(e))); }, [group]);
 
   const run = async (fn: () => Promise<Member[]>, self: boolean) => {
-    setBusy(true); setError(null);
-    try { setList(await fn()); setEmail(""); if (self) onSelf(); }
+    setBusy(true); setError(null); setNote(null);
+    const known = new Set((list ?? []).map((m) => m.email));
+    try {
+      const next = await fn();
+      const added = next.find((m) => !known.has(m.email));
+      if (added?.status === "invited") setNote(t("pp.sent", { email: added.email }));
+      setList(next); setEmail(""); if (self) onSelf();
+    }
     catch (e) { setError(message(e)); }
     finally { setBusy(false); }
   };
@@ -54,6 +65,15 @@ function Members({ group, what, onSelf }: { group: string; what: string; onSelf:
         {list?.map((m) => (
           <li key={m.email} className="mk-chip">
             {m.name ? `${m.name} · ` : ""}{m.email}
+            {m.status === "invited" && (
+              <>
+                {" "}<span className="mk-muted">· {t("pp.invited")}</span>{" "}
+                <button type="button" className="mk-linkbutton" disabled={busy}
+                  onClick={() => { setBusy(true); resendInvite(m.email).then(() => setNote(t("pp.resent", { email: m.email })))
+                    .catch((e) => setError(message(e))).finally(() => setBusy(false)); }}>{t("pp.resend")}</button>
+              </>
+            )}
+            {m.status === "disabled" && <>{" "}<span className="mk-muted">· {t("pp.disabled")}</span></>}
             <button type="button" className="mk-chip__x" disabled={busy} aria-label={t("hh.remove", { email: m.email, what })}
               onClick={() => {
                 if (m.email.toLowerCase() === me && !window.confirm(t("hh.removeself", { what }))) return;
@@ -69,6 +89,7 @@ function Members({ group, what, onSelf }: { group: string; what: string; onSelf:
           onChange={(e) => setEmail(e.target.value)} aria-label={t("hh.addto", { what })} />
         <button type="submit" className="mk-button mk-button--ghost" disabled={busy || !email.includes("@")}>{t("hh.add")}</button>
       </form>
+      {note && <p className="mk-ok" role="status">{note}</p>}
       {error && <p className="mk-error" role="alert">{error}</p>}
     </div>
   );
@@ -208,6 +229,58 @@ export function OperatorPanel() {
           <button type="button" className="mk-linkbutton" onClick={() => void refreshGroups()}>{t("op.refresh")}</button> {t("op.tosee")}
         </p>
       )}
+    </div>
+  );
+}
+
+/** Operators: every account on this site; turn one off or on (ADR-0007). */
+export function PeoplePanel() {
+  const session = useSession();
+  const { t } = useT();
+  const [list, setList] = React.useState<Member[] | null>(null);
+  const [q, setQ] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  React.useEffect(() => { allPeople().then(setList).catch((e) => setError(message(e))); }, []);
+  const toggle = async (m: Member) => {
+    if (m.status !== "disabled" && !window.confirm(t("pp.disable.confirm", { email: m.email }))) return;
+    setBusy(true); setError(null);
+    try { setList(await setUserEnabled(m.email, m.status === "disabled")); }
+    catch (e) { setError(message(e)); }
+    finally { setBusy(false); }
+  };
+  const me = (session.email ?? "").toLowerCase();
+  const shown = (list ?? []).filter((m) => !q || `${m.email} ${m.name ?? ""}`.toLowerCase().includes(q.toLowerCase()));
+  return (
+    <div className="mk-panel">
+      <h2 className="mk-panel__title">{t("pp.title")}</h2>
+      <p className="mk-panel__hint">{t("pp.hint")}</p>
+      <input className="mk-input" type="search" placeholder={t("pp.search")} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t("pp.search")} />
+      <table className="mk-table">
+        <thead><tr><th>{t("pp.who")}</th><th>{t("pp.status")}</th><th /></tr></thead>
+        <tbody>
+          {shown.map((m) => (
+            <tr key={m.email}>
+              <td>{m.name ? `${m.name} · ` : ""}{m.email}</td>
+              <td>{t(`pp.${m.status ?? "active"}`)}</td>
+              <td>
+                {m.status === "invited" && (
+                  <button type="button" className="mk-linkbutton" disabled={busy}
+                    onClick={() => { setBusy(true); resendInvite(m.email).catch((e) => setError(message(e))).finally(() => setBusy(false)); }}>{t("pp.resend")}</button>
+                )}{" "}
+                {m.email.toLowerCase() !== me && (
+                  <button type="button" className="mk-linkbutton" disabled={busy} onClick={() => void toggle(m)}>
+                    {m.status === "disabled" ? t("pp.enable") : t("pp.disable")}
+                  </button>
+                )}
+              </td>
+            </tr>
+          ))}
+          {list && shown.length === 0 && <tr><td colSpan={3} className="mk-muted">{t("hh.nobody")}</td></tr>}
+          {!list && !error && <tr><td colSpan={3} className="mk-muted">…</td></tr>}
+        </tbody>
+      </table>
+      {error && <p className="mk-error" role="alert">{error}</p>}
     </div>
   );
 }

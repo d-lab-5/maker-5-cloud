@@ -1,5 +1,5 @@
 import * as React from "react";
-import qrcode from "qrcode-generator";
+import { Qr } from "./Qr";
 import { setUpTOTP, updateMFAPreference, verifyTOTPSetup } from "aws-amplify/auth";
 import { useT } from "../lib/i18n";
 
@@ -16,20 +16,6 @@ import { useT } from "../lib/i18n";
 
 const APP = "maker-5.dlab5";   // the name an authenticator app shows; rename.mjs rewrites it
 
-export function Qr({ text, size = 176 }: { text: string; size?: number }) {
-  const q = qrcode(0, "M");
-  q.addData(text);
-  q.make();
-  const n = q.getModuleCount();
-  let d = "";
-  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) d += `M${c + 4} ${r + 4}h1v1h-1z`;
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${n + 8} ${n + 8}`} role="img" aria-label="QR code" shapeRendering="crispEdges">
-      <rect width={n + 8} height={n + 8} fill="#fff" />
-      <path d={d} fill="#000" />
-    </svg>
-  );
-}
 
 /** The key in groups of four, easier to type than one long string. */
 const grouped = (secret: string) => secret.replace(/(.{4})/g, "$1 ").trim();
