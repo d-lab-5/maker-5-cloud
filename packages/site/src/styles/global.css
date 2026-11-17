@@ -1163,14 +1163,14 @@ a {
 .mk-sheet--tiny { grid-template-columns: repeat(auto-fill, 14mm); grid-auto-rows: 17mm; gap: 2mm; }
 .mk-sheet--tag { grid-template-columns: repeat(auto-fill, 31mm); grid-auto-rows: 31mm; gap: 2mm; }
 .mk-sheet--article { grid-template-columns: repeat(3, 70mm); grid-auto-rows: 37mm; padding: 0; gap: 0; }
-.mk-label { display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; font-family: "IBM Plex Mono", ui-monospace, monospace; }
+.mk-label { display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; font-family: var(--mk-font-mono); }
 .mk-sheet--article .mk-label { flex-direction: row; gap: 3mm; padding: 3mm; justify-content: flex-start; }
 .mk-label__qr svg { display: block; width: 100%; height: 100%; }
 .mk-label__text { display: flex; flex-direction: column; align-items: center; line-height: 1.15; }
 .mk-sheet--article .mk-label__text { align-items: flex-start; }
 .mk-label__code { font-size: 6pt; letter-spacing: 0.04em; }
 .mk-sheet--tag .mk-label__code, .mk-sheet--article .mk-label__code { font-size: 8pt; }
-.mk-label__title { font-family: "IBM Plex Sans", system-ui, sans-serif; font-size: 7pt; text-align: center; }
+.mk-label__title { font-family: var(--mk-font); font-size: 7pt; text-align: center; }
 .mk-sheet--article .mk-label__title { font-size: 10pt; font-weight: 600; text-align: left; }
 .mk-label__sub { font-size: 7pt; color: #333; }
 

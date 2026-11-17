@@ -46,7 +46,8 @@ export const onRenderBody: GatsbySSR["onRenderBody"] = ({
   ]);
 
   /*
-   * Applies the stored theme before the body paints.
+   * Applies the stored theme before the body paints; with none stored, the
+   * device's (prefers-color-scheme), as on an edge.
    *
    * Without this the page renders dark, React hydrates, and only then does the
    * stored preference apply — a visible flash on every load for anyone who
@@ -63,6 +64,7 @@ export const onRenderBody: GatsbySSR["onRenderBody"] = ({
       dangerouslySetInnerHTML={{
         __html:
           "try{var t=localStorage.getItem('mk-theme');" +
+          "if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';" +
           "if(t==='light')document.documentElement.setAttribute('data-mk-theme','light');}" +
           "catch(e){}",
       }}
