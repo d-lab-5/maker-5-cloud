@@ -73,10 +73,10 @@ A product adds its own routes behind the same gate (the Mediathek's
 `media/uploads`, `media/items` …): `versionGate`, then `verifyDeviceToken`,
 then the tenant from the token row — never from the body.
 
-### Maker-5: the workspace's stock
+### Maker-5: the organisation's stock
 
 `functions/edgeMaterials` (ADR-0008 and ADR-0010 in maker-5-shared). An edge
-reads its workspace's stock and takes parts for one of its products; it never
+reads its organisation's (tenant's) stock and takes parts for one of its workspaces (spaces); it never
 edits the catalogue, receives stock or mints codes. Every step is logged as
 `edge:<edge_id>`. A refusal (not free, not taken, no such article) is **422**
 `{error: "refused", message}`, with the message meant for a person.

@@ -47,11 +47,11 @@ const now = () => new Date().toISOString();
 const sk = () => `${now()}#${randomBytes(3).toString("hex")}`;
 
 function reads(actor: Actor, tenantId: string) {
-  if (!actor.tenants.has(tenantId)) throw new Refused("You are not in that workspace.");
+  if (!actor.tenants.has(tenantId)) throw new Refused("You are not in that organisation.");
 }
 function administers(actor: Actor, tenantId: string) {
   reads(actor, tenantId);
-  if (!actor.admin(tenantId)) throw new Refused("Only the workspace's admins do that.");
+  if (!actor.admin(tenantId)) throw new Refused("Only the organisation's admins do that.");
 }
 
 async function query<X>(params: Record<string, unknown>, limit = 1000): Promise<X[]> {
@@ -77,12 +77,12 @@ export async function getUnitRow(tenantId: string, id: string): Promise<Unit | n
 }
 async function mustArticle(tenantId: string, id: string) {
   const a = await getArticleRow(tenantId, id);
-  if (!a) throw new Refused("No such article in this workspace.");
+  if (!a) throw new Refused("No such article in this organisation.");
   return a;
 }
 async function mustUnit(tenantId: string, id: string) {
   const u = await getUnitRow(tenantId, id);
-  if (!u) throw new Refused("No such unit in this workspace.");
+  if (!u) throw new Refused("No such unit in this organisation.");
   return u;
 }
 
@@ -199,7 +199,7 @@ export async function spaceMaterials(actor: Actor, spaceId: string) {
 
 async function usable(actor: Actor, spaceId: string): Promise<Space> {
   const space = await getSpace(spaceId);
-  if (!space || !actor.tenants.has(space.tenantId) || !actor.usesSpace(space)) throw new Refused("You do not work on that product.");
+  if (!space || !actor.tenants.has(space.tenantId) || !actor.usesSpace(space)) throw new Refused("You do not work in that workspace.");
   return space;
 }
 
@@ -260,7 +260,7 @@ export async function adjust(actor: Actor, tenantId: string, articleId: string, 
   if (a.tracking !== "bulk") throw new Refused("A serialised article's count follows its units: receive or retire units instead.");
   const n = Number(onHand);
   if (!Number.isInteger(n) || n < 0) throw new Refused("On hand is a whole number, 0 or more.");
-  if (n < a.reserved) throw new Refused(`${a.reserved} are reserved by products: release them first, or count at least that many.`);
+  if (n < a.reserved) throw new Refused(`${a.reserved} are reserved by workspaces: release them first, or count at least that many.`);
   await transact([
     { Update: {
       TableName: T.articles(), Key: { tenantId, id: articleId },
@@ -290,7 +290,7 @@ export async function step(actor: Actor, s: Step, spaceId: string, articleId: st
     if (u.articleId !== articleId) throw new Refused("That unit is not of this article.");
     const { from, to } = UNIT_STEP[s];
     if (u.state !== from) throw new Refused(`That unit is ${u.state}, not ${from}.`);
-    if (s !== "reserve" && u.spaceId !== spaceId) throw new Refused("That unit is not with this product.");
+    if (s !== "reserve" && u.spaceId !== spaceId) throw new Refused("That unit is not with this workspace.");
     const keep = to === "reserved" || to === "in-use";
     items.push({ Update: {
       TableName: T.units(), Key: { tenantId, id: u.id },
@@ -318,9 +318,9 @@ export async function step(actor: Actor, s: Step, spaceId: string, articleId: st
   items.push(movement({ tenantId, kind: s, articleId, unitId: r.unitId, spaceId, qty: q, by: actor.by, note }));
   await transact(items, {
     reserve: a.tracking === "bulk" ? `Only ${a.free} ${a.unit} of ${a.name} are free.` : "That unit was taken meanwhile.",
-    release: "The product has not reserved that many.",
-    consume: "The product has not reserved that many.",
-    return: "The product has not used that many.",
+    release: "The workspace has not reserved that many.",
+    consume: "The workspace has not reserved that many.",
+    return: "The workspace has not used that many.",
   }[s]);
   return { done: s, qty: q };
 }
@@ -347,7 +347,7 @@ export async function changeUnit(actor: Actor, tenantId: string, unitId: string,
   }
   if (u.spaceId) {
     const space = await getSpace(u.spaceId);
-    if (space && !actor.usesSpace(space) && !actor.admin(tenantId)) throw new Refused("That unit is with a product you do not work on.");
+    if (space && !actor.usesSpace(space) && !actor.admin(tenantId)) throw new Refused("That unit is with a workspace you do not work in.");
   }
   const sets: string[] = ["updatedAt = :at"];
   const removes: string[] = [];
@@ -452,7 +452,7 @@ export async function bindCode(actor: Actor, tenantId: string, raw: string, kind
     }
   } catch (e) {
     if ((e as { name?: string }).name === "ConditionalCheckFailedException") {
-      throw new Refused(code.kind === "m5" ? "That code is not a blank code of this workspace, or it is bound already." : "That code already points at something in this workspace.");
+      throw new Refused(code.kind === "m5" ? "That code is not a blank code of this organisation, or it is bound already." : "That code already points at something in this organisation.");
     }
     throw e;
   }
