@@ -23,6 +23,8 @@ import { edgeDeviceApproval } from "./functions/edgeDeviceApproval/resource";
 import { edgeGraphs } from "./functions/edgeGraphs/resource";
 import { edgeModels } from "./functions/edgeModels/resource";
 import { edgeRelease } from "./functions/edgeRelease/resource";
+import { materials } from "./functions/materials/resource";
+import { edgeMaterials } from "./functions/edgeMaterials/resource";
 import { MIN_EDGE_VERSION } from "./functions/edge-shared/http";
 
 const backend = defineBackend({
@@ -40,6 +42,8 @@ const backend = defineBackend({
   edgeGraphs,
   edgeModels,
   edgeRelease,
+  materials,
+  edgeMaterials,
 });
 
 /* ------------------------------------------------------------------------ *
@@ -164,6 +168,9 @@ backend.tenants.addEnvironment("TENANT_TABLE_NAME", tenantTable.tableName);
 allow(tn, [
   "cognito-idp:CreateGroup", "cognito-idp:AdminAddUserToGroup", "cognito-idp:AdminRemoveUserFromGroup",
   "cognito-idp:ListUsers", "cognito-idp:ListUsersInGroup", "cognito-idp:AdminGetUser",
+  // invitations (ADR-0007): create and re-send; operators turn accounts off and on
+  "cognito-idp:AdminCreateUser", "cognito-idp:AdminListGroupsForUser",
+  "cognito-idp:AdminDisableUser", "cognito-idp:AdminEnableUser",
 ], [anyUserPool(tn)]);
 
 /* ------------------------------------------------------------------------ *
@@ -213,7 +220,7 @@ edgeRegistryTable.addGlobalSecondaryIndex({
 });
 
 for (const fn of [backend.edgeDeviceAuthz, backend.edgeToken, backend.edgeTokenRotate, backend.edgeTelemetry,
-                  backend.edgeDeviceApproval, backend.edgeGraphs, backend.edgeModels]) {
+                  backend.edgeDeviceApproval, backend.edgeGraphs, backend.edgeModels, backend.edgeMaterials]) {
   fn.addEnvironment("DEVICE_CODES_TABLE_NAME", deviceCodesTable.tableName);
   fn.addEnvironment("EDGE_REGISTRY_TABLE_NAME", edgeRegistryTable.tableName);
 }
@@ -251,6 +258,7 @@ allow(backend.graphs.resources.lambda, ["dynamodb:GetItem", "dynamodb:PutItem"],
 allow(backend.edgeGraphs.resources.lambda, ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Scan"], [graphTable.tableArn]);
 allow(backend.edgeGraphs.resources.lambda, ["dynamodb:GetItem"], [edgeRegistryTable.tableArn]);
 allow(backend.edgeModels.resources.lambda, ["dynamodb:GetItem"], [edgeRegistryTable.tableArn]);
+allow(backend.edgeMaterials.resources.lambda, ["dynamodb:GetItem"], [edgeRegistryTable.tableArn]);
 for (const f of [backend.graphs, backend.edgeGraphs]) {
   f.addEnvironment("GRAPH_TABLE_NAME", graphTable.tableName);
   spaceRead(f.resources.lambda, f);
@@ -261,6 +269,59 @@ for (const f of [backend.graphs, backend.edgeGraphs]) {
 for (const fn of [backend.graphs.resources.lambda, backend.edgeDeviceApproval.resources.lambda]) {
   allow(fn, ["cognito-idp:AdminGetUser"], [anyUserPool(fn)]);
 }
+
+/* ------------------------------------------------------------------------ *
+ * A workspace's stock (ADR-0008 to ADR-0010 in maker-5-shared).
+ *
+ * Plain tables in the DATA stack, like the pairing tables: quantities need
+ * atomic counters and conditional writes, which a graph cannot give. The
+ * materials function (AppSync, data) is their only writer for people;
+ * edgeMaterials (edge stack) reads them and takes parts for a product; its
+ * handler offers no catalogue, receiving or code operation, and it is not
+ * granted any write on the codes table.
+ * ------------------------------------------------------------------------ */
+
+const stockTable = (id: string, pk: string, sortKey?: string) => new Table(dataStack, id, {
+  partitionKey: { name: pk, type: AttributeType.STRING },
+  ...(sortKey ? { sortKey: { name: sortKey, type: AttributeType.STRING } } : {}),
+  billingMode: BillingMode.PAY_PER_REQUEST,
+  pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
+  encryption: TableEncryption.AWS_MANAGED,
+});
+const gsi = (t: Table, indexName: string, pk: string, sortKey: string) => t.addGlobalSecondaryIndex({
+  indexName, partitionKey: { name: pk, type: AttributeType.STRING },
+  sortKey: { name: sortKey, type: AttributeType.STRING }, projectionType: ProjectionType.ALL,
+});
+const articlesTable = stockTable("MkArticles", "tenantId", "id");
+const unitsTable = stockTable("MkUnits", "tenantId", "id");
+gsi(unitsTable, "byArticle", "articleId", "id");
+gsi(unitsTable, "bySpace", "spaceId", "id");
+gsi(unitsTable, "byParent", "parentId", "id");
+const allocationsTable = stockTable("MkAllocations", "spaceId", "articleId");
+gsi(allocationsTable, "byArticle", "articleId", "spaceId");
+const movementsTable = stockTable("MkMovements", "tenantId", "sk");
+gsi(movementsTable, "byArticle", "articleId", "sk");
+gsi(movementsTable, "byUnit", "unitId", "sk");
+gsi(movementsTable, "bySpace", "spaceId", "sk");
+const codesTable = stockTable("MkCodes", "pk");
+gsi(codesTable, "byTarget", "target", "pk");
+
+const stockTables = { ARTICLES: articlesTable, UNITS: unitsTable, ALLOCATIONS: allocationsTable, MOVEMENTS: movementsTable, CODES: codesTable };
+const withIndexes = (t: Table) => [t.tableArn, `${t.tableArn}/index/*`];
+for (const f of [backend.materials, backend.edgeMaterials]) {
+  for (const [k, t] of Object.entries(stockTables)) f.addEnvironment(`${k}_TABLE_NAME`, t.tableName);
+  spaceRead(f.resources.lambda, f);
+}
+allow(backend.materials.resources.lambda,
+  ["dynamodb:GetItem", "dynamodb:BatchGetItem", "dynamodb:Query", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:ConditionCheckItem"],
+  Object.values(stockTables).flatMap(withIndexes));
+allow(backend.materials.resources.lambda, ["cognito-idp:AdminGetUser"], [anyUserPool(backend.materials.resources.lambda)]);
+// An edge reads everything and changes counts, units, allocations and the
+// log through its steps; it never writes codes.
+allow(backend.edgeMaterials.resources.lambda, ["dynamodb:GetItem", "dynamodb:BatchGetItem", "dynamodb:Query"],
+  Object.values(stockTables).flatMap(withIndexes));
+allow(backend.edgeMaterials.resources.lambda, ["dynamodb:UpdateItem", "dynamodb:PutItem"],
+  [articlesTable.tableArn, unitsTable.tableArn, allocationsTable.tableArn, movementsTable.tableArn]);
 
 // The HTTP API. Paths are the wire contract; they do not move.
 const edgeApi = new HttpApi(edgeStack, "EdgeHttpApi", {
@@ -281,6 +342,8 @@ const routes: Array<[string, lambda.IFunction]> = [
   ["/edge/v1/graphs/get", backend.edgeGraphs.resources.lambda],
   ["/edge/v1/graphs/put", backend.edgeGraphs.resources.lambda],
   ["/edge/v1/models", backend.edgeModels.resources.lambda],
+  ...["list", "get", "unit", "resolve", "product", "reserve", "release", "return"].map(
+    (r) => [`/edge/v1/materials/${r}`, backend.edgeMaterials.resources.lambda] as [string, lambda.IFunction]),
 ];
 for (const [path, fn] of routes) {
   edgeApi.addRoutes({

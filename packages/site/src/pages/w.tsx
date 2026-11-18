@@ -3,6 +3,7 @@ import type { HeadFC, PageProps } from "gatsby";
 import { Shell } from "../components/Shell";
 import { getSpace } from "../lib/data";
 import type { Space } from "../lib/data";
+import { SpaceMaterials } from "../components/SpaceMaterials";
 
 /**
  * Every route under /w/.
@@ -26,6 +27,7 @@ import type { Space } from "../lib/data";
 const VIEWS = [
   "overview",
   "items",
+  "materials",
   "reports",
   "import",
   "export",
@@ -120,6 +122,7 @@ const SpacePage: React.FC<PageProps> = ({ location }) => {
 const LABELS: Record<View, string> = {
   overview: "Overview",
   items: "Items",
+  materials: "Materials",
   reports: "Reports",
   import: "Import",
   export: "Export",
@@ -173,6 +176,9 @@ function ViewBody({ view, space }: { view: View; space: Space }) {
         </div>
       );
 
+    case "materials":
+      return <SpaceMaterials space={space} />;
+
     case "reports":
       return (
         <div className="mk-panel">
@@ -215,4 +221,4 @@ function ViewBody({ view, space }: { view: View; space: Space }) {
 
 export default SpacePage;
 
-export const Head: HeadFC = () => <title>Space · maker-5.dlab5</title>;
+export const Head: HeadFC = () => <title>Workspace · maker5.cloud</title>;

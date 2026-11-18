@@ -4,6 +4,7 @@ import { tenants } from "../functions/tenants/resource";
 import { graphs } from "../functions/graphs/resource";
 import { edgeDeviceApproval } from "../functions/edgeDeviceApproval/resource";
 import { edgeRelease } from "../functions/edgeRelease/resource";
+import { materials } from "../functions/materials/resource";
 
 /**
  * DynamoDB holds *metadata and structural references only*.
@@ -229,6 +230,8 @@ const schema = a.schema({
   Member: a.customType({
     email: a.string().required(),
     name: a.string(),
+    /** invited (never signed in), active or disabled. */
+    status: a.string(),
   }),
 
   addTenant: a
@@ -280,6 +283,50 @@ const schema = a.schema({
     .returns(a.ref("Member").array())
     .authorization((allow) => [allow.authenticated()])
     .handler(a.handler.function(tenants)),
+
+  /** Accounts are by invitation (ADR-0007): addMember invites an e-mail without one. */
+  resendInvite: a
+    .mutation()
+    .arguments({ email: a.string().required() })
+    .returns(a.ref("Member"))
+    .authorization((allow) => [allow.authenticated()])
+    .handler(a.handler.function(tenants)),
+
+  /** Operators: every account, and turning one off or on. */
+  allPeople: a
+    .query()
+    .returns(a.ref("Member").array())
+    .authorization((allow) => [allow.group("mk-admins")])
+    .handler(a.handler.function(tenants)),
+
+  setUserEnabled: a
+    .mutation()
+    .arguments({ email: a.string().required(), enabled: a.boolean().required() })
+    .returns(a.ref("Member").array())
+    .authorization((allow) => [allow.group("mk-admins")])
+    .handler(a.handler.function(tenants)),
+
+  /* ---------------------------------------------------------------------- *
+   * A workspace's stock (ADR-0008 to ADR-0010 in maker-5-shared). Its tables
+   * are made in backend.ts, not as models: only the materials function
+   * reads and writes them. One query and one mutation with an operation
+   * name and JSON arguments (see functions/materials/handler.ts for the
+   * operations and who may run each).
+   * ---------------------------------------------------------------------- */
+
+  materials: a
+    .query()
+    .arguments({ op: a.string().required(), args: a.json() })
+    .returns(a.json())
+    .authorization((allow) => [allow.authenticated()])
+    .handler(a.handler.function(materials)),
+
+  changeMaterials: a
+    .mutation()
+    .arguments({ op: a.string().required(), args: a.json() })
+    .returns(a.json())
+    .authorization((allow) => [allow.authenticated()])
+    .handler(a.handler.function(materials)),
 });
 
 export type Schema = ClientSchema<typeof schema>;

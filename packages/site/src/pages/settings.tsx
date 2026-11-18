@@ -3,7 +3,7 @@ import type { HeadFC } from "gatsby";
 import { Shell } from "../components/Shell";
 import { refreshGroups, useSession } from "../components/AuthGate";
 import { MfaSetup } from "../components/MfaSetup";
-import { TenantPanel, OperatorPanel } from "../components/Tenants";
+import { TenantPanel, OperatorPanel, PeoplePanel } from "../components/Tenants";
 import { edgeRelease, listEdges, listTenants, revokeEdge } from "../lib/data";
 import type { EdgeRelease, EdgeSummary } from "../lib/data";
 import { appInfo, versionAtLeast } from "../lib/about";
@@ -51,6 +51,7 @@ const SettingsPage: React.FC = () => {
 
       {session.isAdmin && <TenantPanel />}
       {session.isOperator && <OperatorPanel />}
+      {session.isOperator && <PeoplePanel />}
       {(session.isAdmin || session.isOperator) && <EdgesPanel />}
       {(session.isAdmin || session.isOperator) && <InstallEdgePanel />}
     </Shell>
@@ -198,4 +199,4 @@ function EdgesPanel() {
 
 export default SettingsPage;
 
-export const Head: HeadFC = () => <title>Settings · maker-5.dlab5</title>;
+export const Head: HeadFC = () => <title>Settings · maker5.cloud</title>;

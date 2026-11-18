@@ -8,7 +8,11 @@ English (the master), German and French. One flat JSON object per language:
   fails when a key or a placeholder is missing in any language.
 - Words people type themselves (names of things, places) are not here: they
   live in the A-Box, with optional translations.
-- The tenant and space nouns default to tenant/space (Mandant/Bereich,
+- Maker-5 calls a tenant an **organisation** (Organisation, organisation) and a
+  space a **workspace** (Arbeitsbereich, espace de travail): a project or a
+  product in development, taking parts from the organisation's stock. Keys
+  keep their names (`hh.createspace`, `un.whichproduct`).
+- The template's tenant and space nouns default to tenant/space (Mandant/Bereich,
   organisation/espace). `scripts/rename.mjs --tenant … --space …` rewrites the
   English ones; review German and French by hand after a rename.
 

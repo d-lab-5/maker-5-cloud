@@ -72,3 +72,21 @@ code. A bare 410 unlinks the edge (ADR-0006).
 A product adds its own routes behind the same gate (the Mediathek's
 `media/uploads`, `media/items` …): `versionGate`, then `verifyDeviceToken`,
 then the tenant from the token row — never from the body.
+
+### Maker-5: the organisation's stock
+
+`functions/edgeMaterials` (ADR-0008 and ADR-0010 in maker-5-shared). An edge
+reads its organisation's (tenant's) stock and takes parts for one of its workspaces (spaces); it never
+edits the catalogue, receives stock or mints codes. Every step is logged as
+`edge:<edge_id>`. A refusal (not free, not taken, no such article) is **422**
+`{error: "refused", message}`, with the message meant for a person.
+
+| Route | Body | Answer |
+|---|---|---|
+| `materials/list` | `{q?, category?}` | `{articles: [{id, name, category, tracking, unit, manufacturer, mpn, location, onHand, reserved, free, low}]}` |
+| `materials/get` | `{id}` (an article) | `{article, units, allocations, movements, codes}` |
+| `materials/unit` | `{id}` (a unit) | `{unit, article, parent, children, movements, codes, space}` |
+| `materials/resolve` | `{code}` | `{status: "article" \| "unit" \| "blank" \| "unknown", code: {kind, value}, tenantId?, id?}`; a code is one of ours (`HTTPS://MAKER-5.CLOUD/T/K7Q2M9`), an EAN/GTIN, a maker's QR text, or `nfc:<uid>` |
+| `materials/product` | `{spaceId}` | `{space, lines: [{articleId, reserved, consumed, article, units}], movements}` |
+| `materials/reserve`, `release`, `return` | `{spaceId, articleId, qty}` or `{spaceId, articleId, unitId}` | `{done, qty}` |
+

@@ -1,6 +1,7 @@
 import * as React from "react";
 import { ThemeSegments } from "./ThemeSegments";
 import { HelpSwitch } from "./Feedback";
+import { useT } from "../lib/i18n";
 
 /**
  * What a visitor sees before signing in.
@@ -15,18 +16,17 @@ import { HelpSwitch } from "./Feedback";
  * should arrive at something that says what this is.
  */
 export function GuestLanding({ children }: { children: React.ReactNode }) {
+  const { t } = useT();
   return (
     <div className="mk-shell mk-shell--railed mk-shell--guest">
-      <nav className="mk-rail" aria-label="Sign in">
+      <nav className="mk-rail" aria-label={t("auth.signin")}>
         <span className="mk-rail__brand">
           <Mark />
-          <span>
-            template<span className="mk-rail__brandaccent">.dlab5</span>
-          </span>
+          <Brand />
         </span>
 
         <div className="mk-rail__section">
-          <h2 className="mk-rail__sectionlabel">Access</h2>
+          <h2 className="mk-rail__sectionlabel">{t("guest.access")}</h2>
           {children}
         </div>
 
@@ -34,64 +34,43 @@ export function GuestLanding({ children }: { children: React.ReactNode }) {
             should be able to turn the lights down without authenticating
             first, and this is the screen they are looking at. */}
         <div className="mk-rail__section">
-          <h2 className="mk-rail__sectionlabel">Appearance</h2>
+          <h2 className="mk-rail__sectionlabel">{t("guest.appearance")}</h2>
           <ThemeSegments />
           <HelpSwitch />
         </div>
 
         <div className="mk-rail__section">
-          <h2 className="mk-rail__sectionlabel">Accounts</h2>
-          <p className="mk-rail__note">
-            There is no sign-up. Accounts are created by an administrator, who
-            also grants access to a tenant's spaces. If you were invited, use the
-            temporary password from your invitation email — you will be asked
-            to choose a new one.
-          </p>
+          <h2 className="mk-rail__sectionlabel">{t("guest.accounts")}</h2>
+          <p className="mk-rail__note">{t("guest.accounts.note")}</p>
         </div>
       </nav>
 
       <div className="mk-shell__body">
-        {/* Order is the argument this page makes: what the repository IS,
-            then whose it is, then what it is for. The mark sits between the
-            claim and the product line rather than on top of them, so the
-            heading is what a reader lands on first. */}
+        {/* What Maker-5 is, in one line. Nothing here is fetched and
+            nothing names an organisation or a workspace (ADR-0002). */}
         <main className="mk-shell__main mk-guest">
           <p className="mk-hero__eyebrow">D-LAB-5</p>
 
           <h1 className="mk-hero__title">
-            A starting point,{" "}
-            <span className="mk-hero__titleaccent">not a product</span>
+            Maker-5{" "}
+            <span className="mk-hero__titleaccent">{t("guest.claim")}</span>
           </h1>
 
           <Logo />
 
-          {/* A paragraph, not a second heading. The page already has its one
-              subject above; making this an h2 would give it two. */}
-          <p className="mk-guest__tagline">
-            The Digital Twin Platform and Product Engineers
-          </p>
-
-          <p className="mk-hero__lede">
-            Gatsby 5 and React 18 in front, an AWS Amplify Gen 2 backend
-            behind, and one Cognito gate over the whole thing. Fork it, run{" "}
-            <code>npm run rename</code>, and start on the part that is actually
-            yours.
-          </p>
-
-          {/* An outbound link, so it carries noreferrer noopener — the tab it
-              opens must not get a handle on this one. */}
-          <a
-            className="mk-coffee"
-            href="https://buymeacoffee.com/dlab5"
-            target="_blank"
-            rel="noreferrer noopener"
-          >
-            <CoffeeIcon />
-            Buy me a coffee
-          </a>
+          <p className="mk-guest__tagline">{t("guest.tagline")}</p>
         </main>
       </div>
     </div>
+  );
+}
+
+/** The name in the rail: the site's domain, as on an edge ("Maker-5 edge"). */
+export function Brand() {
+  return (
+    <span>
+      maker5<span className="mk-rail__brandaccent">.cloud</span>
+    </span>
   );
 }
 
@@ -131,27 +110,6 @@ function Logo() {
         height={480}
       />
     </div>
-  );
-}
-
-function CoffeeIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M4 8h12v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8Z" />
-      <path d="M16 9h1.5a2.5 2.5 0 0 1 0 5H16" />
-      <path d="M7 2v2.5M10.5 2v2.5M14 2v2.5" />
-      <path d="M3 21h14" />
-    </svg>
   );
 }
 

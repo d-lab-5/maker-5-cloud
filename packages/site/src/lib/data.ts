@@ -49,10 +49,14 @@ const LIST_TENANTS = /* GraphQL */ `
   }
 `;
 
-const MEMBER = `email name`;
+const MEMBER = `email name status`;
 const GROUP_MEMBERS = `query GroupMembers($group: String!) { groupMembers(group: $group) { ${MEMBER} } }`;
 const ADD_MEMBER = `mutation AddMember($group: String!, $email: String!) { addMember(group: $group, email: $email) { ${MEMBER} } }`;
 const REMOVE_MEMBER = `mutation RemoveMember($group: String!, $email: String!) { removeMember(group: $group, email: $email) { ${MEMBER} } }`;
+const RESEND_INVITE = `mutation ResendInvite($email: String!) { resendInvite(email: $email) { ${MEMBER} } }`;
+const ALL_PEOPLE = `query AllPeople { allPeople { ${MEMBER} } }`;
+const SET_USER_ENABLED = `mutation SetUserEnabled($email: String!, $enabled: Boolean!) {
+  setUserEnabled(email: $email, enabled: $enabled) { ${MEMBER} } }`;
 const CREATE_SPACE = `mutation AddSpace($tenantId: String!, $name: String!) {
   addSpace(tenantId: $tenantId, name: $name) { ${SPACE_FIELDS} } }`;
 const RENAME_SPACE = `mutation RenameSpace($spaceId: String!, $name: String!) {
@@ -150,6 +154,9 @@ async function call<T>(query: string, variables?: Record<string, unknown>, { qui
   return unwrap(result);
 }
 
+/** For lib/materials.ts: the same call, loading card and error unwrapping. */
+export const callApi = call;
+
 /** Every page of a list query. */
 async function all_<T>(query: string, field: string, variables: Record<string, unknown> = {}): Promise<T[]> {
   const out: T[] = [];
@@ -196,15 +203,23 @@ export async function getSpace(id: string): Promise<Space | null> {
 /** Tenants this person administers (and, for operators, all of them: names only). */
 export const listTenants = () => all_<Tenant>(LIST_TENANTS, "listTenants");
 
-export interface Member { email: string; name?: string | null }
+/** status: invited (never signed in), active or disabled. */
+export interface Member { email: string; name?: string | null; status?: "invited" | "active" | "disabled" | null }
 
 /** group: a space id (its readers) or a tenant id (its admins). The tenant's admins only. */
 export const groupMembers = async (group: string) =>
   (await call<{ groupMembers: Member[] }>(GROUP_MEMBERS, { group })).groupMembers;
+/** Adds an existing account, or invites the e-mail when it has none (ADR-0007). */
 export const addMember = async (group: string, email: string) =>
   (await call<{ addMember: Member[] }>(ADD_MEMBER, { group, email })).addMember;
 export const removeMember = async (group: string, email: string) =>
   (await call<{ removeMember: Member[] }>(REMOVE_MEMBER, { group, email })).removeMember;
+export const resendInvite = async (email: string) =>
+  (await call<{ resendInvite: Member }>(RESEND_INVITE, { email })).resendInvite;
+/** Operators: every account. */
+export const allPeople = async () => (await call<{ allPeople: Member[] }>(ALL_PEOPLE)).allPeople;
+export const setUserEnabled = async (email: string, enabled: boolean) =>
+  (await call<{ setUserEnabled: Member[] }>(SET_USER_ENABLED, { email, enabled })).setUserEnabled;
 export const createSpace = async (tenantId: string, name: string) =>
   (await call<{ addSpace: Space }>(CREATE_SPACE, { tenantId, name })).addSpace;
 export const renameSpace = async (spaceId: string, name: string) =>

@@ -90,4 +90,4 @@ const IndexPage: React.FC<PageProps> = () => {
 
 export default IndexPage;
 
-export const Head: HeadFC = () => <title>Spaces · maker-5.dlab5</title>;
+export const Head: HeadFC = () => <title>Workspaces · maker5.cloud</title>;

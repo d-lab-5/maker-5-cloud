@@ -49,4 +49,13 @@ export const onCreatePage: GatsbyNode["onCreatePage"] = async ({
     actions.deletePage(page);
     actions.createPage({ ...page, matchPath: "/w/*" });
   }
+  // A code's card (ADR-0009 in maker-5-shared): labels print /T/<code> in
+  // capitals (the QR's alphanumeric mode), tags carry /t/<code>. Two hosting
+  // rewrites to /t/index.html (200) go with these; without them the 404
+  // page sends /t/<code> and /T/<code> to /t/?c=<code>.
+  if (page.path === "/t/") {
+    actions.deletePage(page);
+    actions.createPage({ ...page, matchPath: "/t/*" });
+    actions.createPage({ ...page, path: "/T/", matchPath: "/T/*" });
+  }
 };

@@ -144,4 +144,4 @@ const LinkPage: React.FC = () => {
 
 export default LinkPage;
 
-export const Head: HeadFC = () => <title>Link an edge · maker-5.dlab5</title>;
+export const Head: HeadFC = () => <title>Link an edge · maker5.cloud</title>;
