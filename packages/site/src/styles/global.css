@@ -1183,7 +1183,3 @@ a {
   .mk-noprint { display: none !important; }
 }
 
-/* the guest page's three points: what Maker-5 holds */
-.mk-guest__points { list-style: none; margin: 0 auto var(--mk-space-6); padding: 0; max-width: 36rem; display: grid; gap: var(--mk-space-2); text-align: left; color: var(--mk-text-muted); }
-.mk-guest__points li { padding-left: 1.25rem; position: relative; }
-.mk-guest__points li::before { content: ""; position: absolute; left: 0; top: .55em; width: .5rem; height: .5rem; border-radius: 2px; background: var(--mk-accent); }

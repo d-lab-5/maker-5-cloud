@@ -46,7 +46,7 @@ export function GuestLanding({ children }: { children: React.ReactNode }) {
       </nav>
 
       <div className="mk-shell__body">
-        {/* What Maker-5 is, then what is in it. Nothing here is fetched and
+        {/* What Maker-5 is, in one line. Nothing here is fetched and
             nothing names an organisation or a workspace (ADR-0002). */}
         <main className="mk-shell__main mk-guest">
           <p className="mk-hero__eyebrow">D-LAB-5</p>
@@ -59,26 +59,6 @@ export function GuestLanding({ children }: { children: React.ReactNode }) {
           <Logo />
 
           <p className="mk-guest__tagline">{t("guest.tagline")}</p>
-
-          <p className="mk-hero__lede">{t("guest.lede")}</p>
-
-          <ul className="mk-guest__points">
-            <li>{t("guest.point.workspaces")}</li>
-            <li>{t("guest.point.stock")}</li>
-            <li>{t("guest.point.edges")}</li>
-          </ul>
-
-          {/* An outbound link, so it carries noreferrer noopener — the tab it
-              opens must not get a handle on this one. */}
-          <a
-            className="mk-coffee"
-            href="https://buymeacoffee.com/dlab5"
-            target="_blank"
-            rel="noreferrer noopener"
-          >
-            <CoffeeIcon />
-            {t("guest.coffee")}
-          </a>
         </main>
       </div>
     </div>
@@ -130,27 +110,6 @@ function Logo() {
         height={480}
       />
     </div>
-  );
-}
-
-function CoffeeIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M4 8h12v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8Z" />
-      <path d="M16 9h1.5a2.5 2.5 0 0 1 0 5H16" />
-      <path d="M7 2v2.5M10.5 2v2.5M14 2v2.5" />
-      <path d="M3 21h14" />
-    </svg>
   );
 }
 
