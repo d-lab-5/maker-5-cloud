@@ -33,4 +33,4 @@ const ScanPage: React.FC = () => {
 };
 
 export default ScanPage;
-export const Head: HeadFC = () => <title>Scan · maker-5.dlab5</title>;
+export const Head: HeadFC = () => <title>Scan · maker5.cloud</title>;

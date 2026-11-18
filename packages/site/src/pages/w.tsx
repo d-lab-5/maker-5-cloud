@@ -221,4 +221,4 @@ function ViewBody({ view, space }: { view: View; space: Space }) {
 
 export default SpacePage;
 
-export const Head: HeadFC = () => <title>Space · maker-5.dlab5</title>;
+export const Head: HeadFC = () => <title>Workspace · maker5.cloud</title>;

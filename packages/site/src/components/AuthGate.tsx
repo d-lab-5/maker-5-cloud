@@ -33,7 +33,7 @@ export interface Session {
 }
 
 /** The name an authenticator app shows next to the code. rename.mjs rewrites it. */
-const TOTP_ISSUER = "maker-5.dlab5";
+const TOTP_ISSUER = "maker5.cloud";
 
 const AuthContext = React.createContext<Session | null>(null);
 

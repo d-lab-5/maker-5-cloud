@@ -14,7 +14,7 @@ import { useT } from "../lib/i18n";
  * so nothing is injected as HTML and the CSP needs no exception.
  */
 
-const APP = "maker-5.dlab5";   // the name an authenticator app shows; rename.mjs rewrites it
+const APP = "maker5.cloud";   // the name an authenticator app shows; rename.mjs rewrites it
 
 
 /** The key in groups of four, easier to type than one long string. */

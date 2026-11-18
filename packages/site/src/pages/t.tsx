@@ -271,4 +271,4 @@ function BindCard({ raw, resolved }: { raw: string; resolved: m.Resolved }) {
 }
 
 export default CardPage;
-export const Head: HeadFC = () => <title>Card · maker-5.dlab5</title>;
+export const Head: HeadFC = () => <title>Card · maker5.cloud</title>;

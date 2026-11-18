@@ -199,4 +199,4 @@ function EdgesPanel() {
 
 export default SettingsPage;
 
-export const Head: HeadFC = () => <title>Settings · maker-5.dlab5</title>;
+export const Head: HeadFC = () => <title>Settings · maker5.cloud</title>;

@@ -22,4 +22,4 @@ const NotFoundPage: React.FC<PageProps> = ({ location }) => {
 
 export default NotFoundPage;
 
-export const Head: HeadFC = () => <title>Not found · maker-5.dlab5</title>;
+export const Head: HeadFC = () => <title>Not found · maker5.cloud</title>;

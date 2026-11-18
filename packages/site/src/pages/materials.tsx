@@ -308,4 +308,4 @@ function ArticlePanel({ tenantId, id, admin, onChanged, onLabels }: {
 
 
 export default MaterialsPage;
-export const Head: HeadFC = () => <title>Materials · maker-5.dlab5</title>;
+export const Head: HeadFC = () => <title>Materials · maker5.cloud</title>;

@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Brand } from "./GuestLanding";
 import { Link } from "gatsby";
 import { signOutAndReload, useSession } from "./AuthGate";
 import { ThemeSegments } from "./ThemeSegments";
@@ -291,9 +292,7 @@ export function Shell({ children, space, active, title }: ShellProps) {
       >
         <Link className="mk-rail__brand" to="/">
           <Mark />
-          <span>
-            template<span className="mk-rail__brandaccent">.dlab5</span>
-          </span>
+          <Brand />
         </Link>
 
         {space ? (

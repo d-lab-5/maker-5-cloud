@@ -42,4 +42,4 @@ const AboutPage: React.FC = () => {
 };
 
 export default AboutPage;
-export const Head: HeadFC = () => <title>About · maker-5.dlab5</title>;
+export const Head: HeadFC = () => <title>About · maker5.cloud</title>;
