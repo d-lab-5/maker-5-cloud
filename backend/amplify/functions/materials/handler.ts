@@ -22,7 +22,7 @@ import type { Step } from "../materials-shared/stock";
 
 type Args = { op?: string; args?: string | Record<string, unknown> };
 
-const ADMIN_OPS = new Set(["saveArticle", "receive", "adjust", "retire", "mintCodes", "unbindCode", "deleteBox"]);
+const ADMIN_OPS = new Set(["saveArticle", "acceptArticle", "dropProposed", "receive", "adjust", "retire", "mintCodes", "unbindCode", "deleteBox"]);
 
 export const handler = async (event: AppSyncResolverEvent<Args>) => {
   const { groups, userPoolId, username } = claimsOf(event.identity);
@@ -53,6 +53,8 @@ export const handler = async (event: AppSyncResolverEvent<Args>) => {
       case "spaceMaterials": return await st.spaceMaterials(actor, String(a.spaceId));
       // the catalogue
       case "saveArticle": return await st.saveArticle(actor, t, a.article ?? {});
+      case "acceptArticle": return await st.acceptArticle(actor, t, String(a.id));
+      case "dropProposed": return await st.dropProposed(actor, t, String(a.id));
       case "receive": return await st.receive(actor, t, String(a.articleId), a);
       case "adjust": return await st.adjust(actor, t, String(a.articleId), Number(a.onHand), a.note);
       // a product takes from stock

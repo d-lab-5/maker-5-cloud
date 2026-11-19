@@ -428,5 +428,15 @@
   "ws.boxes.count": "{n} inside",
   "ws.boxes.none": "No box is marked for this workspace yet.",
   "ws.view.materials": "Materials",
-  "ws.view.overview": "Overview"
+  "ws.view.overview": "Overview",
+  "mt.proposed": "proposed",
+  "mt.proposed.note": "{n} articles proposed by an edge wait for an admin.",
+  "mt.proposed.show": "Show only those",
+  "mt.proposed.all": "Show all",
+  "mt.proposed.by": "by {by} on {at}, from a BOM import. Nothing can be received or taken for it until it is accepted.",
+  "mt.proposed.accept": "Accept",
+  "mt.proposed.drop": "Delete the proposal",
+  "mt.proposed.accepted": "Accepted: it is an article like any other now.",
+  "mt.proposed.dropped": "The proposal is deleted.",
+  "mt.proposed.adminonly": "An admin accepts or deletes it."
 }

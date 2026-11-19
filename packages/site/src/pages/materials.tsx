@@ -35,6 +35,7 @@ const MaterialsPage: React.FC<PageProps> = () => {
   const [list, setList] = React.useState<Article[] | null>(null);
   const [q, setQ] = React.useState("");
   const [cat, setCat] = React.useState("");
+  const [onlyProposed, setOnlyProposed] = React.useState(false);
   const [open, setOpen] = React.useState(params().get("a") ?? "");
   const [adding, setAdding] = React.useState(false);
   const [labels, setLabels] = React.useState<{ items: LabelItem[]; layout: Layout } | null>(null);
@@ -99,6 +100,13 @@ const MaterialsPage: React.FC<PageProps> = () => {
               </select>
               {admin && <button type="button" className="mk-button" onClick={() => setAdding(true)}>{t("mt.add")}</button>}
             </div>
+            {(list?.some((a) => a.proposed) || onlyProposed) && (
+              <p className="mk-panel__hint mk-proposed-note">
+                {t("mt.proposed.note", { n: list?.filter((a) => a.proposed).length ?? 0 })}{" "}
+                <button type="button" className="mk-linkbutton" onClick={() => setOnlyProposed(!onlyProposed)}>
+                  {onlyProposed ? t("mt.proposed.all") : t("mt.proposed.show")}</button>
+              </p>
+            )}
             {adding && <ArticleForm tenantId={w} onDone={(a) => { setAdding(false); if (a) { load(); setOpen(a.id); } }} />}
             <table className="mk-table mk-stock">
               <thead><tr>
@@ -106,12 +114,13 @@ const MaterialsPage: React.FC<PageProps> = () => {
                 <th className="mk-num">{t("mt.onhand")}</th><th className="mk-num">{t("mt.reserved")}</th><th className="mk-num">{t("mt.free")}</th>
               </tr></thead>
               <tbody>
-                {list?.map((a) => (
+                {list?.filter((a) => !onlyProposed || a.proposed).map((a) => (
                   <tr key={a.id} className={`${a.id === open ? "mk-row--on" : ""}${a.low ? " mk-row--low" : ""}`}
                     onClick={() => setOpen(a.id === open ? "" : a.id)} tabIndex={0}
                     onKeyDown={(e) => { if (e.key === "Enter") setOpen(a.id === open ? "" : a.id); }}>
                     <td><strong>{a.name}</strong>{a.manufacturer || a.mpn ? <span className="mk-muted"> · {[a.manufacturer, a.mpn].filter(Boolean).join(" ")}</span> : null}
-                      {a.tracking === "serial" && <span className="mk-pill">{t("mt.serial")}</span>}</td>
+                      {a.tracking === "serial" && <span className="mk-pill">{t("mt.serial")}</span>}
+                      {a.proposed && <span className="mk-pill mk-pill--warn">{t("mt.proposed")}</span>}</td>
                     <td>{t(`cat.${a.category}`)}</td>
                     <td className="mk-num">{a.onHand} {a.unit !== "pcs" ? a.unit : ""}</td>
                     <td className="mk-num">{a.reserved}</td>
@@ -317,11 +326,23 @@ function ArticlePanel({ tenantId, id, admin, onChanged, onLabels }: {
         {a.datasheet && <> · <a href={a.datasheet} target="_blank" rel="noreferrer">{t("mt.f.datasheet")}</a></>}
       </p>
       {a.note && <p className="mk-panel__hint">{a.note}</p>}
+      {a.proposed && (
+        <div className="mk-take">
+          <p><strong>{t("mt.proposed")}</strong> · {t("mt.proposed.by", { by: a.proposed.by, at: a.proposed.at.slice(0, 10) })}</p>
+          {admin ? (
+            <div className="mk-toolbar">
+              <button type="button" className="mk-button" onClick={() => void run(() => m.acceptArticle(tenantId, a.id), t("mt.proposed.accepted"))}>{t("mt.proposed.accept")}</button>
+              <button type="button" className="mk-button mk-button--ghost" onClick={() => void run(() => m.dropProposed(tenantId, a.id), t("mt.proposed.dropped"))}>{t("mt.proposed.drop")}</button>
+            </div>
+          ) : <p className="mk-muted">{t("mt.proposed.adminonly")}</p>}
+          {error && <p className="mk-error" role="alert">{error}</p>}
+        </div>
+      )}
       {d.codes.length > 0 && (
         <p className="mk-panel__hint">{t("mt.codes")}: {d.codes.map((c) => <code key={c.pk} className="mk-id">{c.kind === "m5" ? c.value : `${c.kind}:${c.value}`}</code>)}</p>
       )}
 
-      {admin && (
+      {admin && !a.proposed && (
         <div className="mk-toolbar">
           {a.tracking === "bulk" ? (
             <>

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ARTICLE, BOX, MAX_BOX_DEPTH, UNIT, Refused, boxFields, boxFits, boxable, fileName, linkFields, UNIT_STEP, articleFields, counts, mintId, qty, wouldLoop, type Article } from "./stock";
+import { ARTICLE, BOX, MAX_BOX_DEPTH, MAX_PROPOSE, UNIT, Refused, accepted, proposalFields, boxFields, boxFits, boxable, fileName, linkFields, UNIT_STEP, articleFields, counts, mintId, qty, wouldLoop, type Article } from "./stock";
 
 // Stock rules (ADR-0008, ADR-0010 in maker-5-shared).
 
@@ -79,4 +79,15 @@ test("links are https, of a known kind; file names lose their path", () => {
   assert.equal(fileName("C:\\work\\doorbell.step"), "doorbell.step");
   assert.equal(fileName("../../etc/passwd"), "passwd");
   assert.throws(() => fileName("   "), Refused);
+});
+
+test("an edge proposes articles: checked like an admin's, at most 50 at once, never with stock moved", () => {
+  const got = proposalFields([{ name: "Optocoupler PC817", category: "electronic" }, { name: "Step-down 12 V to 5 V" }]);
+  assert.deepEqual(got.map((a) => [a.name, a.category, a.tracking]), [["Optocoupler PC817", "electronic", "bulk"], ["Step-down 12 V to 5 V", "other", "bulk"]]);
+  assert.throws(() => proposalFields([]), Refused);
+  assert.throws(() => proposalFields([{ name: "" }]), Refused);
+  assert.throws(() => proposalFields([{ name: "x", category: "food" }]), Refused);
+  assert.throws(() => proposalFields(Array.from({ length: MAX_PROPOSE + 1 }, (_, i) => ({ name: `p${i}` }))), Refused);
+  assert.throws(() => accepted({ name: "PC817", proposed: { by: "edge:e-1", at: "2026-01-01" } }), /proposed/);
+  assert.doesNotThrow(() => accepted({ name: "PC817" }));
 });

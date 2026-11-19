@@ -9,7 +9,7 @@ import { verifyDeviceToken } from "../edge-shared/registry";
 import * as st from "../materials-shared/store";
 
 type Body = { q?: string; category?: string; id?: string; code?: string; spaceId?: string; articleId?: string;
-  qty?: number; unitId?: string; note?: string };
+  qty?: number; unitId?: string; note?: string; articles?: unknown };
 
 export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> => {
   const tooOld = versionGate(event);
@@ -41,6 +41,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
         const { box, ...rest } = await st.box(actor, tenant, String(b.id ?? ""));
         return json(200, { ...rest, box: { ...box, files: (box.files ?? []).map(({ id, name, kind, size }) => ({ id, name, kind, size })) } });
       }
+      // a BOM import proposes the articles it needs; an admin accepts them (ADR-0014)
+      case "propose": return json(200, await st.proposeArticles(actor, tenant, b.articles));
       case "reserve": case "release": case "return":
         return json(200, await st.step(actor, route, String(b.spaceId ?? ""), String(b.articleId ?? ""), b));
       default: return json(404, { error: "not_found" });

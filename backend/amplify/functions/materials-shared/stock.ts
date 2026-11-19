@@ -29,6 +29,9 @@ export interface Article {
   onHand: number; reserved: number; free: number;
   /** How many of onHand sit in boxes (ADR-0011); never more than onHand. */
   boxed?: number;
+  /** Proposed by an edge (a BOM import, ADR-0014) and not yet accepted by an
+   *  admin: it has no stock, and nothing may be received or taken for it. */
+  proposed?: { by: string; at: string };
 }
 export interface Unit {
   tenantId: string; id: string; articleId: string; serial?: string; state: (typeof UNIT_STATES)[number];
@@ -73,6 +76,23 @@ export function articleFields(a: Record<string, unknown>, existing?: Article) {
     location: text(a.location ?? existing?.location, 80),
     note: text(a.note ?? existing?.note, 500),
   };
+}
+
+/* -- articles an edge proposes (ADR-0014) ---------------------------------- */
+
+export const MAX_PROPOSE = 50;      // in one call
+export const MAX_PROPOSED = 200;    // waiting in one organisation
+
+/** The articles of one proposal, each checked as an admin's would be. */
+export function proposalFields(list: unknown) {
+  if (!Array.isArray(list) || list.length === 0) throw new Refused("Propose at least one article.");
+  if (list.length > MAX_PROPOSE) throw new Refused(`At most ${MAX_PROPOSE} articles at once.`);
+  return list.map((a) => articleFields((a ?? {}) as Record<string, unknown>));
+}
+
+/** Stock moves only for an accepted article. */
+export function accepted(a: Pick<Article, "name" | "proposed">) {
+  if (a.proposed) throw new Refused(`${a.name} is proposed, not accepted yet; an admin accepts it on Materials.`);
 }
 
 /** A unit may not end up inside itself: walk the new parent's chain. */

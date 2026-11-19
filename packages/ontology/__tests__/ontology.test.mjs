@@ -53,3 +53,19 @@ test("a block names one article of the stock, with a whole quantity", async () =
     assert.equal((await validate(`${P}<https://maker-5.cloud/id/block/b-1> a m5:Block ; schema:name "x" ; ${bad} .`)).conforms, false, bad);
   }
 });
+
+test("a wire joins two pins of blocks, and a block's supply and place are one each (ADR-0014)", async () => {
+  const B = "https://maker-5.cloud/id/block";
+  const parts = `${P}<${B}/b-1> a m5:Block ; schema:name "Controller" ; m5:supplyState m5:SupplyToBuy ; m5:canvasX 40 ; m5:canvasY 80 .
+<${B}/b-2> a m5:Block ; schema:name "Opto" .
+<${B}/b-1#p11> a m5:Pin ; schema:name "GPIO17" ; m5:pinOf <${B}/b-1> ; m5:pinNumber 11 ; m5:pinRole m5:PinSignal .
+<${B}/b-2#p4> a m5:Pin ; schema:name "C" ; m5:pinOf <${B}/b-2> ; m5:pinNumber 4 .`;
+  const wire = `<https://maker-5.cloud/id/wire/w-1> a m5:Wire ; m5:wireColor "yellow" ;`;
+  assert.ok((await validate(`${parts}\n${wire} m5:wireEnd <${B}/b-1#p11> , <${B}/b-2#p4> .`)).conforms);
+  for (const bad of [`${wire} m5:wireEnd <${B}/b-1#p11> .`,
+                     `<${B}/b-3> a m5:Block ; schema:name "x" ; m5:supplyState m5:PinPower .`,
+                     `<${B}/b-1#p12> a m5:Pin ; schema:name "y" .`,
+                     `<${B}/b-1#p13> a m5:Pin ; schema:name "z" ; m5:pinOf <${B}/b-1> ; m5:pinRole m5:SupplyToBuy .`]) {
+    assert.equal((await validate(`${parts}\n${bad}`)).conforms, false, bad);
+  }
+});

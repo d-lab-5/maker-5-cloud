@@ -11,6 +11,8 @@ export interface Article {
   tenantId: string; id: string; name: string; category: string; tracking: "bulk" | "serial"; unit: string;
   manufacturer?: string; mpn?: string; minStock?: number; location?: string; note?: string; datasheet?: string;
   onHand: number; reserved: number; free: number; low?: boolean; boxed?: number;
+  /** Proposed by an edge's BOM import, not accepted yet (ADR-0014). */
+  proposed?: { by: string; at: string };
 }
 export interface Unit {
   tenantId: string; id: string; articleId: string; serial?: string; state: "in-stock" | "reserved" | "in-use" | "retired";
@@ -80,6 +82,8 @@ export const spaceMaterials = (spaceId: string) =>
     lines: Array<{ articleId: string; reserved: number; consumed: number; article: Article | null; units: Unit[] }>; movements: Movement[] }>("spaceMaterials", { spaceId });
 
 export const saveArticle = (tenantId: string, a: Partial<Article>) => change<Article>("saveArticle", { tenantId, article: a });
+export const acceptArticle = (tenantId: string, id: string) => change<Article>("acceptArticle", { tenantId, id });
+export const dropProposed = (tenantId: string, id: string) => change<{ deleted: string }>("dropProposed", { tenantId, id });
 export const receive = (tenantId: string, articleId: string, r: { qty?: number; units?: Array<{ serial?: string; location?: string }>; note?: string }) =>
   change<{ received: number; units: Unit[] }>("receive", { tenantId, articleId, ...r });
 export const adjust = (tenantId: string, articleId: string, onHand: number, note?: string) => change("adjust", { tenantId, articleId, onHand, note });

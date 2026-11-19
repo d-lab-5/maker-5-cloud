@@ -22,8 +22,8 @@ import { doc, getSpace, type Space } from "../shared/spaces";
 import { BadCode, codeKey, labelUrl, mintOwn, normalise, type Code } from "./codes";
 import {
   ARTICLE, BOX, MAX_FILE_BYTES, MAX_FILES, MAX_LINKS, LINK_KINDS, UNIT, Refused, UNIT_STEP, articleFields, boxFields, boxFits, boxable,
-  counts, fileName, linkFields, mintId, qty, wouldLoop,
-  type Article, type Box, type BoxFile, type BoxLink, type Step, type Unit,
+  counts, fileName, linkFields, mintId, qty, wouldLoop, accepted, proposalFields, MAX_PROPOSED,
+  type Article, type Box, type BoxFile, type BoxLink, type Step, type Unit
 } from "./stock";
 
 export { Refused, BadCode };
@@ -284,11 +284,70 @@ export async function saveArticle(actor: Actor, tenantId: string, a: Record<stri
   return item;
 }
 
+/**
+ * An edge proposes articles a BOM needs (ADR-0014). Each is made with no
+ * stock and marked proposed until an admin accepts it; one whose name an
+ * article already has is not made again, and the existing one is returned.
+ */
+export async function proposeArticles(actor: Actor, tenantId: string, list: unknown) {
+  reads(actor, tenantId);
+  const fields = proposalFields(list);
+  const all = await query<Article>({
+    TableName: T.articles(), KeyConditionExpression: "tenantId = :t", ExpressionAttributeValues: { ":t": tenantId },
+  }, 5000);
+  const byName = new Map(all.map((a) => [a.name.toLowerCase(), a]));
+  const waiting = all.filter((a) => a.proposed).length;
+  const fresh = fields.filter((f, i) => !byName.has(f.name.toLowerCase())
+    && fields.findIndex((g) => g.name.toLowerCase() === f.name.toLowerCase()) === i);
+  if (waiting + fresh.length > MAX_PROPOSED) {
+    throw new Refused(`${waiting} proposed articles wait already; accept or delete some on Materials first.`);
+  }
+  const out: Array<{ id: string; name: string; status: "proposed" | "exists" }> = [];
+  for (const f of fields) {
+    const known = byName.get(f.name.toLowerCase());
+    if (known) { out.push({ id: known.id, name: known.name, status: "exists" }); continue; }
+    const item = {
+      ...f, tenantId, id: mintId("a"), onHand: 0, reserved: 0, free: 0,
+      proposed: { by: actor.by, at: now() }, createdAt: now(), updatedAt: now(), createdBy: actor.by,
+    };
+    await doc.send(new PutCommand({ TableName: T.articles(), Item: item, ConditionExpression: "attribute_not_exists(id)" }));
+    byName.set(f.name.toLowerCase(), item as unknown as Article);
+    out.push({ id: item.id, name: item.name, status: "proposed" });
+  }
+  return { articles: out };
+}
+
+/** An admin accepts a proposed article: from now on it is like any other. */
+export async function acceptArticle(actor: Actor, tenantId: string, id: string) {
+  administers(actor, tenantId);
+  const a = await mustArticle(tenantId, id);
+  if (!a.proposed) return a;
+  await doc.send(new UpdateCommand({
+    TableName: T.articles(), Key: { tenantId, id }, UpdateExpression: "SET updatedAt = :at REMOVE proposed",
+    ConditionExpression: "attribute_exists(id)", ExpressionAttributeValues: { ":at": now() },
+  }));
+  const { proposed: _p, ...rest } = a;
+  return rest;
+}
+
+/** An admin turns a proposal down: only a proposed article, which has no stock. */
+export async function dropProposed(actor: Actor, tenantId: string, id: string) {
+  administers(actor, tenantId);
+  const a = await mustArticle(tenantId, id);
+  if (!a.proposed) throw new Refused("Only a proposed article is deleted; an accepted one is retired by its stock.");
+  await doc.send(new DeleteCommand({
+    TableName: T.articles(), Key: { tenantId, id },
+    ConditionExpression: "attribute_exists(proposed) AND onHand = :z", ExpressionAttributeValues: { ":z": 0 },
+  }));
+  return { deleted: id };
+}
+
 /** Stock comes in: a quantity of a bulk article, or units of a serialised one. */
 export async function receive(actor: Actor, tenantId: string, articleId: string,
   r: { qty?: number; units?: Array<{ serial?: string; location?: string }>; note?: string }) {
   administers(actor, tenantId);
   const a = await mustArticle(tenantId, articleId);
+  accepted(a);
   const note = String(r.note ?? "").slice(0, 300) || undefined;
   if (a.tracking === "bulk") {
     const q = qty(r.qty);
@@ -344,6 +403,7 @@ export async function step(actor: Actor, s: Step, spaceId: string, articleId: st
   const space = await usable(actor, spaceId);
   const tenantId = space.tenantId;
   const a = await mustArticle(tenantId, articleId);
+  accepted(a);
   const note = String(r.note ?? "").slice(0, 300) || undefined;
   let q = 1;
   const items: unknown[] = [];
@@ -493,7 +553,7 @@ export async function mintCodes(actor: Actor, tenantId: string, n: number) {
 }
 
 async function target(tenantId: string, kind: string, id: string) {
-  if (kind === "article") await mustArticle(tenantId, id);
+  if (kind === "article") accepted(await mustArticle(tenantId, id));
   else if (kind === "unit") await mustUnit(tenantId, id);
   else if (kind === "box") await mustBox(tenantId, id);
   else throw new Refused("A code points at an article, a unit or a box.");

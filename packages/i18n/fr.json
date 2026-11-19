@@ -428,5 +428,15 @@
   "ws.boxes.count": "{n} dedans",
   "ws.boxes.none": "Aucune boîte n'est encore attribuée à cet espace de travail.",
   "ws.view.materials": "Matériel",
-  "ws.view.overview": "Vue d'ensemble"
+  "ws.view.overview": "Vue d'ensemble",
+  "mt.proposed": "proposé",
+  "mt.proposed.note": "{n} articles proposés par un edge attendent un admin.",
+  "mt.proposed.show": "N'afficher qu'eux",
+  "mt.proposed.all": "Tout afficher",
+  "mt.proposed.by": "par {by} le {at}, depuis un import de nomenclature. Rien ne peut être reçu ni pris tant qu'il n'est pas accepté.",
+  "mt.proposed.accept": "Accepter",
+  "mt.proposed.drop": "Supprimer la proposition",
+  "mt.proposed.accepted": "Accepté : c'est désormais un article comme un autre.",
+  "mt.proposed.dropped": "La proposition est supprimée.",
+  "mt.proposed.adminonly": "Un admin l'accepte ou la supprime."
 }

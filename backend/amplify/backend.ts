@@ -330,6 +330,8 @@ allow(backend.materials.resources.lambda,
 allow(backend.materials.resources.lambda, ["cognito-idp:AdminGetUser"], [anyUserPool(backend.materials.resources.lambda)]);
 // An empty box is deleted (an admin's step); nothing else in the stock is.
 allow(backend.materials.resources.lambda, ["dynamodb:DeleteItem"], [boxesTable.tableArn]);
+// A proposed article an admin turns down (ADR-0014): it never had stock.
+allow(backend.materials.resources.lambda, ["dynamodb:DeleteItem"], [articlesTable.tableArn]);
 // A box's files: under boxes/ only, never a space's object.
 allow(backend.materials.resources.lambda, ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"], [`${bucket.bucketArn}/boxes/*`]);
 backend.materials.addEnvironment("OBJECT_BUCKET_NAME", bucket.bucketName);
@@ -359,7 +361,7 @@ const routes: Array<[string, lambda.IFunction]> = [
   ["/edge/v1/graphs/get", backend.edgeGraphs.resources.lambda],
   ["/edge/v1/graphs/put", backend.edgeGraphs.resources.lambda],
   ["/edge/v1/models", backend.edgeModels.resources.lambda],
-  ...["list", "get", "unit", "resolve", "product", "reserve", "release", "return", "boxes", "box"].map(
+  ...["list", "get", "unit", "resolve", "product", "reserve", "release", "return", "boxes", "box", "propose"].map(
     (r) => [`/edge/v1/materials/${r}`, backend.edgeMaterials.resources.lambda] as [string, lambda.IFunction]),
 ];
 for (const [path, fn] of routes) {
