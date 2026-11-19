@@ -10,8 +10,9 @@ import { useT } from "../lib/i18n";
  *   tiny      10 mm QR and its code: an SD card, a SIM, a cable end
  *   tag       20 mm QR, code and name: a part bag, a board
  *   article   70 × 37 mm: QR, name, part number, code (24 a sheet)
- *   box       95 × 65 mm: a 40 mm QR, the box's name large, its workspace
- *             and code (8 a sheet), for a carton, a bag, a drawer
+ *   box       63.5 × 38.1 mm (the common address label, 21 a sheet): a
+ *             30 mm QR, read from a shelf 30 to 40 cm away, the box's name
+ *             in bold, its code and workspace; for a carton, a bag, a drawer
  *
  * The QR holds HTTPS://<this site's host>/T/<code>: version 2 at L for tiny,
  * which is 25 modules in 10 mm (0.4 mm each, fine for a 600 dpi laser).
@@ -25,7 +26,7 @@ const SIZE: Record<Layout, { qr: number; ecc: "L" | "M" }> = {
   tiny: { qr: 10, ecc: "L" },
   tag: { qr: 20, ecc: "M" },
   article: { qr: 25, ecc: "M" },
-  box: { qr: 40, ecc: "M" },
+  box: { qr: 30, ecc: "M" },
 };
 
 export function LabelSheet({ items, layout, onClose }: { items: LabelItem[]; layout: Layout; onClose: () => void }) {
