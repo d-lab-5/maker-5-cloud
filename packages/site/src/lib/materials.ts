@@ -43,10 +43,12 @@ export interface BoxDetail {
 }
 export interface CodeRow { pk: string; kind: "m5" | "ean" | "qr" | "nfc"; value: string }
 export interface StockWorkspace { id: string; name: string; admin: boolean }
+/** A code as the site reads it; a GS1 code also names a serial number and a batch. */
+export interface ReadCode { kind: string; value: string; serial?: string; batch?: string }
 export type Resolved =
-  | { status: "article" | "unit" | "box"; code: { kind: string; value: string }; tenantId: string; id: string }
-  | { status: "blank"; code: { kind: string; value: string }; tenantId: string }
-  | { status: "unknown"; code: { kind: string; value: string } };
+  | { status: "article" | "unit" | "box"; code: ReadCode; tenantId: string; id: string; articleId?: string; bySerial?: boolean }
+  | { status: "blank"; code: ReadCode; tenantId: string }
+  | { status: "unknown"; code: ReadCode };
 
 const Q = `query Materials($op: String!, $args: AWSJSON) { materials(op: $op, args: $args) }`;
 const M = `mutation ChangeMaterials($op: String!, $args: AWSJSON) { changeMaterials(op: $op, args: $args) }`;

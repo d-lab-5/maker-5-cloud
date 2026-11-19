@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { codeKey, gtinValid, labelUrl, mintOwn, normalise, OWN } from "./codes";
+import { codeKey, gs1, gtinValid, labelUrl, mintOwn, normalise, OWN } from "./codes";
 
 // Codes and tags (ADR-0009 in maker-5-shared). Every code here is invented,
 // with a correct check digit where one is needed.
@@ -48,4 +48,21 @@ test("NFC UIDs and anything else", () => {
 test("ours are keyed for the site, aliases within a workspace", () => {
   assert.equal(codeKey({ kind: "m5", value: "K7Q2M9" }, "t-aaaaaaaaaa"), "m5:K7Q2M9");
   assert.equal(codeKey({ kind: "ean", value: "04006381333931" }, "t-aaaaaaaaaa"), "t-aaaaaaaaaa#ean:04006381333931");
+});
+
+// GS1: the GTIN names the article, the serial number the unit. 09506000134352
+// is GS1's own example GTIN; the serials are invented.
+test("GS1 codes give their GTIN, serial number and batch", () => {
+  const G = "09506000134352";
+  const GS = String.fromCharCode(29);
+  assert.deepEqual(gs1(`01${G}21SN-0042${GS}10LOT7`), { gtin: G, serial: "SN-0042", batch: "LOT7" }, "a DataMatrix as scanned");
+  assert.deepEqual(gs1(`]d201${G}10LOT7${GS}21SN-0042`), { gtin: G, serial: "SN-0042", batch: "LOT7" }, "with a symbology prefix");
+  assert.deepEqual(gs1(`01${G}17271231` + "21SN-0042"), { gtin: G, serial: "SN-0042" }, "a fixed-length expiry between");
+  assert.deepEqual(gs1(`(01)${G}(21)SN-0042`), { gtin: G, serial: "SN-0042" }, "the printed form");
+  assert.deepEqual(gs1(`https://id.example.org/01/${G}/21/SN-0042?x=1`), { gtin: G, serial: "SN-0042", batch: undefined }, "a Digital Link");
+  assert.equal(gs1(`01${G.slice(0, 13)}9` + "21X"), null, "a wrong check digit is no GTIN");
+  assert.equal(gs1("4006381333931"), null, "a bare EAN is no element string");
+  assert.deepEqual(normalise(`01${G}21SN-0042`), { kind: "ean", value: G, serial: "SN-0042" });
+  assert.deepEqual(normalise(`(01)${G}`), { kind: "ean", value: G });
+  assert.equal(codeKey(normalise(`01${G}21SN-0042`), "t-x"), codeKey(normalise("9506000134352"), "t-x"), "the same article's alias");
 });

@@ -2,6 +2,8 @@ import * as React from "react";
 import { CameraScanner, hasNfc, writeTag } from "./Scanner";
 import { History } from "./History";
 import { LabelSheet } from "./Labels";
+import { BindCard } from "./BindCard";
+import { UnitPicker } from "./UnitPicker";
 import * as m from "../lib/materials";
 import { listSpaces, type Space } from "../lib/data";
 import { useT } from "../lib/i18n";
@@ -84,7 +86,7 @@ export function BoxCard({ tenantId, id }: { tenantId: string; id: string }) {
         )}
       </div>
 
-      {panel === "in" && <CheckIn tenantId={tenantId} boxId={id} onDone={(msg) => { setOk(msg); load(); }} onError={setError} />}
+      {panel === "in" && <CheckIn tenantId={tenantId} boxId={id} admin={admin} onDone={(msg) => { setOk(msg); load(); }} onError={setError} />}
       {panel === "move" && <MoveBox tenantId={tenantId} box={b} run={run} />}
       {panel === "edit" && <EditBox tenantId={tenantId} box={b} spaces={spaces} run={run} />}
       {ok && <p className="mk-ok" role="status">{ok}</p>}
@@ -142,18 +144,26 @@ export function BoxCard({ tenantId, id }: { tenantId: string; id: string }) {
   );
 }
 
-/** Scan (or type) a part's code and put it into this box. */
-function CheckIn({ tenantId, boxId, onDone, onError }: { tenantId: string; boxId: string; onDone: (msg: string) => void; onError: (e: string | null) => void }) {
+/**
+ * Scan (or type) a part's code and put it into this box: our small label, the
+ * product's own barcode (EAN, a GS1 DataMatrix with its serial), a maker's QR,
+ * or a serial number printed on the board. A product barcode of an article
+ * tracked unit by unit asks which unit; a code nobody knows is bound here.
+ */
+function CheckIn({ tenantId, boxId, admin, onDone, onError }: {
+  tenantId: string; boxId: string; admin: boolean; onDone: (msg: string) => void; onError: (e: string | null) => void;
+}) {
   const { t } = useT();
   const [raw, setRaw] = React.useState("");
   const [bulk, setBulk] = React.useState<m.Article | null>(null);
   const [qty, setQty] = React.useState(1);
-  const [unknown, setUnknown] = React.useState("");
+  const [which, setWhich] = React.useState<{ article: m.Article; serial?: string } | null>(null);
+  const [unknown, setUnknown] = React.useState<{ raw: string; resolved: m.Resolved } | null>(null);
   const [stock, setStock] = React.useState<m.Article[]>([]);
   React.useEffect(() => { void m.articles(tenantId).then((as) => setStock(as.filter((a) => a.tracking === "bulk"))); }, [tenantId]);
 
   const found = async (code: string) => {
-    onError(null); setUnknown(""); setBulk(null); setRaw("");
+    onError(null); setUnknown(null); setBulk(null); setWhich(null); setRaw("");
     try {
       const r = await m.resolveCode(code);
       if (r.status === "unit" && r.tenantId === tenantId) {
@@ -161,14 +171,16 @@ function CheckIn({ tenantId, boxId, onDone, onError }: { tenantId: string; boxId
         onDone(t("bx.in.done"));
       } else if (r.status === "article" && r.tenantId === tenantId) {
         const a = (await m.article(tenantId, r.id)).article;
-        if (a.tracking === "serial") onError(t("bx.in.serial", { name: a.name }));
+        if (a.tracking === "serial") setWhich({ article: a, serial: r.code.serial });
         else { setBulk(a); setQty(1); }
       } else if (r.status === "box" && r.tenantId === tenantId) {
         if (r.id === boxId) { onError(t("bx.in.self")); return; }
         await m.moveBox(tenantId, r.id, { parentId: boxId });
         onDone(t("bx.in.box"));
+      } else if (r.status === "blank" || r.status === "unknown") {
+        setUnknown({ raw: code, resolved: r });
       } else {
-        setUnknown(code);
+        onError(t("bx.in.elsewhere"));
       }
     } catch (e) { onError(message(e)); }
   };
@@ -195,7 +207,14 @@ function CheckIn({ tenantId, boxId, onDone, onError }: { tenantId: string; boxId
           <button type="submit" className="mk-button">{t("bx.checkin")}</button>
         </>}
       </form>
-      {unknown && <p>{t("bx.in.unknown")} <a href={`/t/?c=${encodeURIComponent(unknown)}`}>{t("un.bind")}</a></p>}
+      {which && (
+        <UnitPicker tenantId={tenantId} articleId={which.article.id} serial={which.serial} skipBox={boxId} admin={admin} action={t("bx.checkin")}
+          onPick={async (u) => { await m.checkIn(tenantId, boxId, { unitId: u.id }); setWhich(null); onDone(t("bx.in.done")); }} />
+      )}
+      {unknown && (
+        <BindCard inline raw={unknown.raw} resolved={unknown.resolved}
+          onBound={() => { const again = unknown.raw; setUnknown(null); void found(again); }} />
+      )}
     </div>
   );
 }

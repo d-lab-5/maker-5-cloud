@@ -179,7 +179,38 @@ async function articleNames(tenantId: string, ids: string[]): Promise<Record<str
   return Object.fromEntries(((r.Responses?.[T.articles()] ?? []) as Array<{ id: string; name: string }>).map((x) => [x.id, x.name]));
 }
 
-/** What a scanned or typed code points at, in the caller's workspaces. */
+/**
+ * The one live unit with this serial number in an organisation (of one
+ * article, if given), as printed on a board or packed into a GS1 code. Two
+ * units with the same serial are no answer.
+ */
+async function unitBySerial(tenantId: string, serial: string, articleId?: string): Promise<Unit | null> {
+  const s = serial.trim();
+  if (!s || s.length > 60) return null;
+  const forms = [...new Set([s, s.toUpperCase(), s.toLowerCase()])];
+  const names = Object.fromEntries(forms.map((_, i) => [`:s${i}`, forms[i]]));
+  const found = await query<Unit>(articleId ? {
+    TableName: T.units(), IndexName: "byArticle", KeyConditionExpression: "articleId = :a",
+    FilterExpression: `serial IN (${Object.keys(names).join(", ")}) AND #st <> :r`,
+    ExpressionAttributeNames: { "#st": "state" }, ExpressionAttributeValues: { ":a": articleId, ":r": "retired", ...names },
+  } : {
+    TableName: T.units(), KeyConditionExpression: "tenantId = :t",
+    FilterExpression: `serial IN (${Object.keys(names).join(", ")}) AND #st <> :r`,
+    ExpressionAttributeNames: { "#st": "state" }, ExpressionAttributeValues: { ":t": tenantId, ":r": "retired", ...names },
+  }, 5);
+  const live = found.filter((u) => u.tenantId === tenantId);
+  return live.length === 1 ? live[0] : null;
+}
+
+/**
+ * What a scanned or typed code points at, in the caller's organisations.
+ *
+ *   our code, or an alias          what it is bound to
+ *   a GTIN with a serial (GS1)     the unit of that article with that serial,
+ *                                  else the article, with the serial to pick by
+ *   a code nobody bound            a unit whose serial it is (a Code 128 or a
+ *                                  MAC sticker on a board), else unknown
+ */
 export async function resolve(actor: Actor, raw: string) {
   const code = normalise(raw);
   const tenants = code.kind === "m5" ? [""] : [...actor.tenants];
@@ -189,7 +220,20 @@ export async function resolve(actor: Actor, raw: string) {
     if (!row) continue;
     if (!actor.tenants.has(row.tenantId)) break;   // somebody else's: as if unknown
     if (!row.target) return { status: "blank", code, tenantId: row.tenantId };
+    if (row.targetKind === "article" && code.serial) {
+      const u = await unitBySerial(row.tenantId, code.serial, row.target);
+      if (u) return { status: "unit", code, tenantId: row.tenantId, id: u.id, articleId: row.target };
+    }
     return { status: row.targetKind, code, tenantId: row.tenantId, id: row.target };
+  }
+  if (code.kind !== "m5") {
+    const serial = code.serial ?? (code.kind === "qr" && !code.value.startsWith("sha256:") ? code.value : undefined);
+    if (serial) {
+      for (const t of actor.tenants) {
+        const u = await unitBySerial(t, serial);
+        if (u) return { status: "unit", code, tenantId: t, id: u.id, articleId: u.articleId, bySerial: true };
+      }
+    }
   }
   return { status: "unknown", code };
 }
@@ -462,6 +506,19 @@ async function target(tenantId: string, kind: string, id: string) {
 export async function bindCode(actor: Actor, tenantId: string, raw: string, kind: string, id: string) {
   reads(actor, tenantId);
   const code: Code = normalise(raw);
+  if (code.kind === "ean" && kind !== "article") {
+    // A GTIN names the product: it goes on the article. A GS1 code's serial
+    // goes on the unit, so the same code finds that unit next time.
+    if (kind !== "unit") throw new Refused("A product's barcode (EAN/GTIN) goes on an article, not a box.");
+    const u = await mustUnit(tenantId, id);
+    if (code.serial && !u.serial) {
+      await doc.send(new UpdateCommand({
+        TableName: T.units(), Key: { tenantId, id: u.id }, UpdateExpression: "SET serial = :s, updatedAt = :at",
+        ConditionExpression: "attribute_not_exists(serial)", ExpressionAttributeValues: { ":s": code.serial.slice(0, 60), ":at": now() },
+      }));
+    }
+    kind = "article"; id = u.articleId;
+  }
   await target(tenantId, kind, id);
   const pk = codeKey(code, tenantId);
   try {
@@ -481,6 +538,11 @@ export async function bindCode(actor: Actor, tenantId: string, raw: string, kind
     }
   } catch (e) {
     if ((e as { name?: string }).name === "ConditionalCheckFailedException") {
+      if (code.kind !== "m5") {
+        // bound to this very thing already (the next box of the same board): fine
+        const had = (await doc.send(new GetCommand({ TableName: T.codes(), Key: { pk } }))).Item as { target?: string } | undefined;
+        if (had?.target === id) return { code, bound: { kind, id } };
+      }
       throw new Refused(code.kind === "m5" ? "That code is not a blank code of this organisation, or it is bound already." : "That code already points at something in this organisation.");
     }
     throw e;
