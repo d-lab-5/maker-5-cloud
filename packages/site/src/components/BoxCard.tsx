@@ -60,7 +60,7 @@ export function BoxCard({ tenantId, id }: { tenantId: string; id: string }) {
   return (
     <div className="mk-card mk-boxcard">
       {labels && (
-        <LabelSheet layout="box" onClose={() => setLabels(null)}
+        <LabelSheet tenantId={tenantId} layout="box" onClose={() => setLabels(null)}
           items={[{ code: labels.id, title: b.name, sub: d.space?.name ?? b.location ?? "" }]} />
       )}
       <p className="mk-muted">

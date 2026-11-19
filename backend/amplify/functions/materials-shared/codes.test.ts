@@ -66,3 +66,10 @@ test("GS1 codes give their GTIN, serial number and batch", () => {
   assert.deepEqual(normalise(`(01)${G}`), { kind: "ean", value: G });
   assert.equal(codeKey(normalise(`01${G}21SN-0042`), "t-x"), codeKey(normalise("9506000134352"), "t-x"), "the same article's alias");
 });
+
+test("a code as printed under the QR, with its M5 mark, is the same code", () => {
+  for (const s of ["M5 K7Q2M9", "m5-k7q2m9", "M5·K7Q2M9", "M5K7Q2M9", "M5:K7Q2M9"]) {
+    assert.deepEqual(normalise(s), { kind: "m5", value: "K7Q2M9" }, s);
+  }
+  assert.notEqual(normalise("M5 K7Q2M").kind, "m5", "five characters are no code of ours");
+});

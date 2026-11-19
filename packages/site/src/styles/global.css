@@ -1165,23 +1165,36 @@ a {
 .mk-sheet--article { grid-template-columns: repeat(3, 70mm); grid-auto-rows: 37mm; padding: 0; gap: 0; }
 /* 63.5 x 38.1 mm address labels, 3 x 7 on A4: 15.15 mm top, 7.2 mm sides, 2.5 mm between columns */
 .mk-sheet--box { grid-template-columns: repeat(3, 63.5mm); grid-auto-rows: 38.1mm; padding: 15.15mm 7.2mm 0; column-gap: 2.5mm; row-gap: 0; }
-.mk-sheet--box .mk-label { flex-direction: row; gap: 2.5mm; padding: 3mm; justify-content: flex-start; }
-.mk-sheet--box .mk-label__qr { flex: none; }
-.mk-sheet--box .mk-label__text { align-items: flex-start; min-width: 0; gap: 1mm; }
-.mk-sheet--box .mk-label__title { font-size: 11pt; font-weight: 700; text-align: left; line-height: 1.1; overflow-wrap: anywhere;
+.mk-sheet--box .mk-label, .mk-label.mk-k-box { flex-direction: row; gap: 2.5mm; padding: 3mm; justify-content: flex-start; }
+.mk-sheet--box .mk-label__qr, .mk-k-box .mk-label__qr { flex: none; }
+.mk-sheet--box .mk-label__text, .mk-k-box .mk-label__text { align-items: flex-start; min-width: 0; gap: 1mm; }
+.mk-sheet--box .mk-label__title, .mk-k-box .mk-label__title { font-size: 11pt; font-weight: 700; text-align: left; line-height: 1.1; overflow-wrap: anywhere;
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-.mk-sheet--box .mk-label__code { font-size: 10pt; letter-spacing: .06em; }
-.mk-sheet--box .mk-label__sub { font-size: 7pt; overflow-wrap: anywhere; }
+.mk-sheet--box .mk-label__code, .mk-k-box .mk-label__code { font-size: 10pt; letter-spacing: .06em; }
+.mk-sheet--box .mk-label__sub, .mk-k-box .mk-label__sub { font-size: 7pt; overflow-wrap: anywhere; }
 .mk-label { display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; font-family: var(--mk-font-mono); }
-.mk-sheet--article .mk-label { flex-direction: row; gap: 3mm; padding: 3mm; justify-content: flex-start; }
+.mk-sheet--article .mk-label, .mk-label.mk-k-article { flex-direction: row; gap: 3mm; padding: 3mm; justify-content: flex-start; }
 .mk-label__qr svg { display: block; width: 100%; height: 100%; }
 .mk-label__text { display: flex; flex-direction: column; align-items: center; line-height: 1.15; }
-.mk-sheet--article .mk-label__text { align-items: flex-start; }
+.mk-sheet--article .mk-label__text, .mk-k-article .mk-label__text { align-items: flex-start; }
 .mk-label__code { font-size: 6pt; letter-spacing: 0.04em; }
-.mk-sheet--tag .mk-label__code, .mk-sheet--article .mk-label__code { font-size: 8pt; }
+.mk-sheet--tag .mk-label__code, .mk-k-tag .mk-label__code, .mk-sheet--article .mk-label__code, .mk-k-article .mk-label__code { font-size: 8pt; }
 .mk-label__title { font-family: var(--mk-font); font-size: 7pt; text-align: center; }
-.mk-sheet--article .mk-label__title { font-size: 10pt; font-weight: 600; text-align: left; }
+.mk-sheet--article .mk-label__title, .mk-k-article .mk-label__title { font-size: 10pt; font-weight: 600; text-align: left; }
 .mk-label__sub { font-size: 7pt; color: #333; }
+
+/* The print queue (ADR-0009): labels of every size packed on plain A4
+   sticker paper (lib/labelPack.ts), each at its place in mm, with cut guides. */
+.mk-label__mark { font-weight: 800; letter-spacing: 0; }
+.mk-qsheet { position: relative; width: 210mm; height: 297mm; box-sizing: border-box; background: #fff; color: #000;
+  margin: 0 0 1rem; box-shadow: var(--mk-shadow); overflow: hidden; }
+.mk-qcell { position: absolute; box-sizing: border-box; }
+.mk-qsheet--guides .mk-qcell { outline: 0.1mm dashed #9aa3ad; outline-offset: 0.9mm; }
+.mk-label.mk-k-tiny, .mk-label.mk-k-tag { gap: 0.5mm; }
+.mk-qsheet__used { position: absolute; left: 0; right: 0; top: 0; display: grid; place-items: center;
+  background: repeating-linear-gradient(45deg, #eef1f4 0 6px, #fff 6px 12px); color: #667; font: 9pt var(--mk-font); }
+.mk-lq-list { margin: 0 0 1rem; }
+.mk-lq-list ul { margin: 0.4rem 0 0; padding-left: 1.2rem; columns: 2 22rem; }
 
 @media print {
   @page { size: A4; margin: 0; }
@@ -1189,6 +1202,9 @@ a {
   body.mk-labels-open .mk-sheet, body.mk-labels-open .mk-sheet * { visibility: visible; }
   body.mk-labels-open .mk-labels { position: absolute; inset: 0; padding: 0; background: #fff; overflow: visible; }
   body.mk-labels-open .mk-sheet { position: absolute; left: 0; top: 0; }
+  body.mk-labels-open .mk-qsheet, body.mk-labels-open .mk-qsheet * { visibility: visible; }
+  body.mk-labels-open .mk-qsheet { margin: 0; box-shadow: none; break-after: page; }
+  body.mk-labels-open .mk-qsheet:last-of-type { break-after: auto; }
   .mk-noprint { display: none !important; }
 }
 

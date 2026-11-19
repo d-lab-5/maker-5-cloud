@@ -1,7 +1,8 @@
 import * as React from "react";
 import type { HeadFC, PageProps } from "gatsby";
 import { Shell } from "../components/Shell";
-import { LabelSheet, type LabelItem, type Layout } from "../components/Labels";
+import { LabelSheet, QueueSheet, type LabelItem, type Layout } from "../components/Labels";
+import { useQueue } from "../lib/labelQueue";
 import { History } from "../components/History";
 import * as m from "../lib/materials";
 import type { Article, StockWorkspace } from "../lib/materials";
@@ -41,6 +42,7 @@ const MaterialsPage: React.FC<PageProps> = () => {
   const [labels, setLabels] = React.useState<{ items: LabelItem[]; layout: Layout } | null>(null);
   const [blank, setBlank] = React.useState(24);
   const [error, setError] = React.useState<string | null>(null);
+  const [queueOpen, setQueueOpen] = React.useState(false);
   const [tab, setTab] = React.useState<"stock" | "boxes">(params().get("tab") === "boxes" ? "boxes" : "stock");
 
   React.useEffect(() => {
@@ -78,6 +80,7 @@ const MaterialsPage: React.FC<PageProps> = () => {
         )}
         {workspaces?.length === 1 && <span className="mk-muted">{ws?.name}</span>}
         <a className="mk-button mk-button--ghost" href="/scan/">{t("nav.scan")}</a>
+        {w && <QueueButton tenantId={w} onOpen={() => setQueueOpen(true)} />}
       </div>
       {workspaces?.length === 0 && <div className="mk-empty"><p>{t("mt.noworkspace")}</p></div>}
       {w && (
@@ -148,12 +151,20 @@ const MaterialsPage: React.FC<PageProps> = () => {
         </div>
       )}
       {error && <p className="mk-error" role="alert">{error}</p>}
-      {labels && <LabelSheet items={labels.items} layout={labels.layout} onClose={() => setLabels(null)} />}
+      {labels && <LabelSheet tenantId={w} items={labels.items} layout={labels.layout} onClose={() => setLabels(null)} />}
+      {queueOpen && w && <QueueSheet tenantId={w} onClose={() => setQueueOpen(false)} />}
     </Shell>
   );
 };
 
 /** The organisation's boxes: find one, make one, print their labels. */
+/** The print queue's button: how many labels wait for a sheet. */
+function QueueButton({ tenantId, onOpen }: { tenantId: string; onOpen: () => void }) {
+  const { t } = useT();
+  const n = useQueue(tenantId).length;
+  return <button type="button" className="mk-button mk-button--ghost" onClick={onOpen}>{t("lq.open", { n })}</button>;
+}
+
 function BoxesPanel({ tenantId, admin, onLabels }: { tenantId: string; admin: boolean; onLabels: (items: LabelItem[]) => void }) {
   const { t } = useT();
   const [list, setList] = React.useState<m.Box[] | null>(null);

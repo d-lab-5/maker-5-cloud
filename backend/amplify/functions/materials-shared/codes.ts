@@ -127,6 +127,9 @@ export function normalise(raw: string): Code {
   const url = OUR_URL.exec(s) ?? LOCAL_URL.exec(s);
   if (url) return { kind: "m5", value: crockford(url[1]) };
   if (OWN.test(crockford(s)) && s.length === 6) return { kind: "m5", value: crockford(s) };
+  // as printed under the QR: "M5 K7Q2M9" (the mark tells a Maker-5 label from another system's)
+  const marked = /^M5[\s·:\-]?([0-9A-Za-z]{6})$/i.exec(s);
+  if (marked && OWN.test(crockford(marked[1]))) return { kind: "m5", value: crockford(marked[1]) };
   const nfc = /^nfc:\s*((?:[0-9a-f]{2}[:\-\s]?){4,10})$/i.exec(s);
   if (nfc) return { kind: "nfc", value: nfc[1].replace(/[:\-\s]/g, "").toUpperCase() };
   const g = gs1(s);
