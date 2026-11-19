@@ -69,3 +69,11 @@ test("a wire joins two pins of blocks, and a block's supply and place are one ea
     assert.equal((await validate(`${parts}\n${bad}`)).conforms, false, bad);
   }
 });
+
+test("a block names at most one Fritzing part, by its file in the library", async () => {
+  const B = `${P}<https://maker-5.cloud/id/block/b-1> a m5:Block ; schema:name "Opto" ;`;
+  assert.ok((await validate(`${B} m5:fritzingPart "core/Sharp-PC817.fzp" .`)).conforms);
+  for (const bad of [`"https://example.org/x.fzp"`, `"obsolete/x.fzp"`, `"core/../x.fzp"`, `"core/a.fzp", "core/b.fzp"`]) {
+    assert.equal((await validate(`${B} m5:fritzingPart ${bad} .`)).conforms, false, bad);
+  }
+});
