@@ -297,16 +297,28 @@ const unitsTable = stockTable("MkUnits", "tenantId", "id");
 gsi(unitsTable, "byArticle", "articleId", "id");
 gsi(unitsTable, "bySpace", "spaceId", "id");
 gsi(unitsTable, "byParent", "parentId", "id");
+// One new index per table per deploy: CloudFormation adds a single GSI at a time.
+gsi(unitsTable, "byBox", "boxId", "id");
 const allocationsTable = stockTable("MkAllocations", "spaceId", "articleId");
 gsi(allocationsTable, "byArticle", "articleId", "spaceId");
 const movementsTable = stockTable("MkMovements", "tenantId", "sk");
 gsi(movementsTable, "byArticle", "articleId", "sk");
 gsi(movementsTable, "byUnit", "unitId", "sk");
 gsi(movementsTable, "bySpace", "spaceId", "sk");
+gsi(movementsTable, "byBox", "boxId", "sk");
 const codesTable = stockTable("MkCodes", "pk");
 gsi(codesTable, "byTarget", "target", "pk");
+// Boxes (ADR-0011 in maker-5-shared): what holds parts, and what is in each.
+const boxesTable = stockTable("MkBoxes", "tenantId", "id");
+gsi(boxesTable, "byParent", "parentId", "id");
+gsi(boxesTable, "bySpace", "spaceId", "id");
+const boxStockTable = stockTable("MkBoxStock", "boxId", "articleId");
+gsi(boxStockTable, "byArticle", "articleId", "boxId");
 
-const stockTables = { ARTICLES: articlesTable, UNITS: unitsTable, ALLOCATIONS: allocationsTable, MOVEMENTS: movementsTable, CODES: codesTable };
+const stockTables = {
+  ARTICLES: articlesTable, UNITS: unitsTable, ALLOCATIONS: allocationsTable, MOVEMENTS: movementsTable, CODES: codesTable,
+  BOXES: boxesTable, BOXSTOCK: boxStockTable,
+};
 const withIndexes = (t: Table) => [t.tableArn, `${t.tableArn}/index/*`];
 for (const f of [backend.materials, backend.edgeMaterials]) {
   for (const [k, t] of Object.entries(stockTables)) f.addEnvironment(`${k}_TABLE_NAME`, t.tableName);
@@ -316,6 +328,11 @@ allow(backend.materials.resources.lambda,
   ["dynamodb:GetItem", "dynamodb:BatchGetItem", "dynamodb:Query", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:ConditionCheckItem"],
   Object.values(stockTables).flatMap(withIndexes));
 allow(backend.materials.resources.lambda, ["cognito-idp:AdminGetUser"], [anyUserPool(backend.materials.resources.lambda)]);
+// An empty box is deleted (an admin's step); nothing else in the stock is.
+allow(backend.materials.resources.lambda, ["dynamodb:DeleteItem"], [boxesTable.tableArn]);
+// A box's files: under boxes/ only, never a space's object.
+allow(backend.materials.resources.lambda, ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"], [`${bucket.bucketArn}/boxes/*`]);
+backend.materials.addEnvironment("OBJECT_BUCKET_NAME", bucket.bucketName);
 // An edge reads everything and changes counts, units, allocations and the
 // log through its steps; it never writes codes.
 allow(backend.edgeMaterials.resources.lambda, ["dynamodb:GetItem", "dynamodb:BatchGetItem", "dynamodb:Query"],
@@ -342,7 +359,7 @@ const routes: Array<[string, lambda.IFunction]> = [
   ["/edge/v1/graphs/get", backend.edgeGraphs.resources.lambda],
   ["/edge/v1/graphs/put", backend.edgeGraphs.resources.lambda],
   ["/edge/v1/models", backend.edgeModels.resources.lambda],
-  ...["list", "get", "unit", "resolve", "product", "reserve", "release", "return"].map(
+  ...["list", "get", "unit", "resolve", "product", "reserve", "release", "return", "boxes", "box"].map(
     (r) => [`/edge/v1/materials/${r}`, backend.edgeMaterials.resources.lambda] as [string, lambda.IFunction]),
 ];
 for (const [path, fn] of routes) {

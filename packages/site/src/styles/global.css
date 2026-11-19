@@ -1163,6 +1163,12 @@ a {
 .mk-sheet--tiny { grid-template-columns: repeat(auto-fill, 14mm); grid-auto-rows: 17mm; gap: 2mm; }
 .mk-sheet--tag { grid-template-columns: repeat(auto-fill, 31mm); grid-auto-rows: 31mm; gap: 2mm; }
 .mk-sheet--article { grid-template-columns: repeat(3, 70mm); grid-auto-rows: 37mm; padding: 0; gap: 0; }
+.mk-sheet--box { grid-template-columns: repeat(2, 95mm); grid-auto-rows: 65mm; gap: 4mm; }
+.mk-sheet--box .mk-label { flex-direction: row; gap: 5mm; padding: 5mm; justify-content: flex-start; border: 0.3mm dashed #999; }
+.mk-sheet--box .mk-label__text { align-items: flex-start; }
+.mk-sheet--box .mk-label__title { font-size: 16pt; font-weight: 700; text-align: left; line-height: 1.15; }
+.mk-sheet--box .mk-label__code { font-size: 14pt; letter-spacing: .08em; }
+.mk-sheet--box .mk-label__sub { font-size: 10pt; }
 .mk-label { display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; font-family: var(--mk-font-mono); }
 .mk-sheet--article .mk-label { flex-direction: row; gap: 3mm; padding: 3mm; justify-content: flex-start; }
 .mk-label__qr svg { display: block; width: 100%; height: 100%; }
@@ -1183,3 +1189,18 @@ a {
   .mk-noprint { display: none !important; }
 }
 
+
+/* Boxes (ADR-0011): the box card's contents, the materials tabs, and the
+   workspace list under its organisation. */
+.mk-org { margin: 0 0 1.5rem; }
+.mk-org__name { font-size: 0.95rem; font-weight: 600; color: var(--mk-text-muted); margin: 0 0 0.5rem; text-transform: none; }
+.mk-tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--mk-border); margin: 0 0 0.75rem; }
+.mk-tab { background: none; border: 0; border-bottom: 2px solid transparent; padding: 0.5rem 0.9rem; font: inherit; color: inherit; cursor: pointer; }
+.mk-tab--on { border-bottom-color: var(--mk-accent); font-weight: 600; }
+.mk-boxlist { list-style: none; padding: 0; margin: 0.25rem 0 0.75rem; }
+.mk-boxlist > li { padding: 0.45rem 0; border-bottom: 1px solid var(--mk-border); }
+.mk-boxlist__row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
+.mk-boxlist--inside { margin: 0.25rem 0 0 1.25rem; }
+.mk-boxlist--inside > li { border-bottom: 0; padding: 0.15rem 0; }
+.mk-boxcard h1 { overflow-wrap: anywhere; }
+.mk-boxcard .mk-boxlist__row .mk-button { padding: 0.3rem 0.7rem; }

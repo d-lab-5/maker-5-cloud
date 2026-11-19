@@ -201,7 +201,7 @@ export const handler = async (event: AppSyncResolverEvent<Args>) => {
         }
       }
       const h = { id: same?.tenantId ?? mint("t"), name };
-      const v: Space = { id: same?.sharedSpaceId ?? mint("s"), tenantId: h.id, tenantName: name, name: "Everyone", kind: "shared" };
+      const v: Space = { id: same?.sharedSpaceId ?? mint("s"), tenantId: h.id, tenantName: name, name: "Shared", kind: "shared" };
       const privates: Space[] = (same?.privates ?? []).map((p) => ({ id: p.id, tenantId: h.id, tenantName: name, name: p.name, kind: "private" }));
       try {
         await cognito.send(new CreateGroupCommand({ UserPoolId: userPoolId, GroupName: h.id, Description: `Admins of ${name}` }));

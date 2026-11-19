@@ -3,6 +3,7 @@ import type { HeadFC, PageProps } from "gatsby";
 import { Shell } from "../components/Shell";
 import { hasNfc, writeTag } from "../components/Scanner";
 import { History } from "../components/History";
+import { BoxCard } from "../components/BoxCard";
 import * as m from "../lib/materials";
 import { listSpaces, type Space } from "../lib/data";
 import { useT } from "../lib/i18n";
@@ -15,6 +16,7 @@ import { useT } from "../lib/i18n";
  *
  *   /t/K7Q2M9  /T/K7Q2M9  /t/?c=<any code>     resolve a code
  *   /t/?w=<workspace>&u=<unit>                 a unit, from the stock page
+ *   /t/?w=<organisation>&x=<box>               a box (ADR-0011)
  *
  * A blank code of ours, or a code nobody knows yet (an EAN on a box, a
  * manufacturer's QR), is offered to be bound to an article or a unit.
@@ -22,15 +24,15 @@ import { useT } from "../lib/i18n";
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-function codeFromLocation(pathname: string, search: string): { code?: string; w?: string; u?: string } {
+function codeFromLocation(pathname: string, search: string): { code?: string; w?: string; u?: string; x?: string } {
   const p = new URLSearchParams(search);
   const path = /^\/t\/([^/]+)\/?$/i.exec(pathname);
-  return { code: p.get("c") ?? (path ? decodeURIComponent(path[1]) : undefined), w: p.get("w") ?? undefined, u: p.get("u") ?? undefined };
+  return { code: p.get("c") ?? (path ? decodeURIComponent(path[1]) : undefined), w: p.get("w") ?? undefined, u: p.get("u") ?? undefined, x: p.get("x") ?? undefined };
 }
 
 const CardPage: React.FC<PageProps> = ({ location }) => {
   const { t } = useT();
-  const [where, setWhere] = React.useState<{ code?: string; w?: string; u?: string }>({});
+  const [where, setWhere] = React.useState<{ code?: string; w?: string; u?: string; x?: string }>({});
   const [resolved, setResolved] = React.useState<m.Resolved | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   React.useEffect(() => {
@@ -42,10 +44,14 @@ const CardPage: React.FC<PageProps> = ({ location }) => {
   const unitRef = where.w && where.u ? { tenantId: where.w, id: where.u }
     : resolved?.status === "unit" ? { tenantId: resolved.tenantId, id: resolved.id } : null;
 
+  const boxRef = where.w && where.x ? { tenantId: where.w, id: where.x }
+    : resolved?.status === "box" ? { tenantId: resolved.tenantId, id: resolved.id } : null;
+
   return (
     <Shell active="scan" title={t("un.title")}>
       {error && <div className="mk-empty"><p className="mk-error" role="alert">{error}</p><p><a href="/scan/">{t("un.scanagain")}</a></p></div>}
-      {!error && !unitRef && !resolved && <p className="mk-muted">…</p>}
+      {!error && !unitRef && !boxRef && !resolved && <p className="mk-muted">…</p>}
+      {boxRef && <BoxCard tenantId={boxRef.tenantId} id={boxRef.id} />}
       {unitRef && <UnitCard tenantId={unitRef.tenantId} id={unitRef.id} />}
       {resolved?.status === "article" && <ArticleCard tenantId={resolved.tenantId} id={resolved.id} />}
       {(resolved?.status === "blank" || resolved?.status === "unknown") && (
@@ -71,6 +77,9 @@ function ArticleCard({ tenantId, id }: { tenantId: string; id: string }) {
         <div className="mk-stat"><dt>{a.onHand}</dt><dd>{t("mt.onhand")}</dd></div>
       </dl>
       {a.location && <p>{t("mt.f.location")}: <strong>{a.location}</strong></p>}
+      {d.boxes.length > 0 && <p>{t("bx.inboxes")}: {d.boxes.map((x) => (
+        <a key={x.boxId} href={m.boxHref(tenantId, x.boxId)} className="mk-chip">{x.name ?? x.boxId} · {x.qty}</a>
+      ))}</p>}
       <TakeForProduct tenantId={tenantId} article={a} />
       <p><a href={`/materials/?w=${tenantId}&a=${a.id}`}>{t("un.instock")}</a></p>
     </div>
@@ -104,11 +113,13 @@ function UnitCard({ tenantId, id }: { tenantId: string; id: string }) {
   return (
     <div className="mk-card">
       <p className="mk-muted">{d.article ? `${t(`cat.${d.article.category}`)} · ` : ""}{own ? <code className="mk-id">{own}</code> : null}</p>
-      <h1>{d.article?.name ?? u.articleId}</h1>
+      <h1>{u.name || d.article?.name || u.articleId}</h1>
+      {u.name && d.article && <p className="mk-muted">{d.article.name}</p>}
       {u.serial && <p>{t("un.serial")}: <strong>{u.serial}</strong></p>}
       <dl className="mk-facts">
         <dt>{t("un.state")}</dt><dd>{t(`state.${u.state}`)}{d.space ? <> · <a href={`/w/${d.space.id}/materials/`}>{d.space.name}</a></> : null}</dd>
-        <dt>{t("mt.f.location")}</dt><dd>{u.location ?? "—"}</dd>
+        <dt>{t("mt.f.location")}</dt><dd>{d.box ? <>{t("bx.inbox")} <a href={m.boxHref(tenantId, d.box.id)}>{d.box.name}</a></>
+          : u.holder ? t("bx.with", { name: u.holder.by }) : u.location ?? "—"}</dd>
         <dt>{t("un.inside")}</dt><dd>{d.parent ? <a href={m.unitHref(tenantId, d.parent.id)}>{d.parent.articleName ?? d.parent.id}{d.parent.serial ? ` · ${d.parent.serial}` : ""}</a> : "—"}</dd>
         <dt>{t("un.holds")}</dt><dd>{d.children.length ? d.children.map((c) => (
           <a key={c.id} href={m.unitHref(tenantId, c.id)} className="mk-chip">{c.articleName ?? c.id}{c.firmware ? ` · ${c.firmware.name} ${c.firmware.version}` : ""}</a>
@@ -125,7 +136,7 @@ function UnitCard({ tenantId, id }: { tenantId: string; id: string }) {
           {own && hasNfc() && (
             <button type="button" className="mk-button mk-button--ghost" onClick={() => {
               const lock = window.confirm(t("un.nfc.lock"));
-              void run(() => writeTag(m.labelUrl(own), lock), t("un.nfc.done"));
+              void run(() => writeTag(m.labelUrl(own).toLowerCase(), lock), t("un.nfc.done"));
             }}>{t("un.nfc")}</button>
           )}
         </div>

@@ -3,11 +3,13 @@
 // OUR code is six characters of Crockford base32, minted in batches and
 // printed before it is bound to anything. A label's QR holds
 //
-//     HTTPS://MAKER-5.CLOUD/T/K7Q2M9
+//     HTTPS://MAKER5.CLOUD/T/K7Q2M9      (the host of the site that printed it)
 //
 // in capitals, so the QR uses its alphanumeric mode and fits version 2 at
 // error correction L (25 modules: about 8 mm on an SD card). An NFC tag holds
-// the same URL. Every host of this site (stage, a sandbox) is accepted back.
+// the same URL in lower case. Every host of this site is accepted back:
+// maker5.cloud and its subdomains (stage), Amplify's branch hosts, localhost,
+// and maker-5.cloud, which the first labels carried.
 //
 // EXISTING codes are aliases of an article or a unit: a GTIN/EAN from the
 // box, a manufacturer's QR (its text, or a hash of it when long), an NFC
@@ -19,7 +21,7 @@ import { createHash, randomInt } from "node:crypto";
 /** Crockford base32: no I, L, O, U. */
 export const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 export const OWN = /^[0-9A-HJKMNP-TV-Z]{6}$/;
-export const LABEL_HOST = "MAKER-5.CLOUD";
+export const LABEL_HOST = "MAKER5.CLOUD";
 
 export type CodeKind = "m5" | "ean" | "qr" | "nfc";
 export interface Code { kind: CodeKind; value: string }
@@ -47,7 +49,7 @@ export function gtinValid(digits: string): boolean {
 /** A GTIN as 14 digits, so the EAN-13 and the GTIN-14 of a box with one item compare equal. */
 export const gtin14 = (digits: string) => digits.padStart(14, "0");
 
-const OUR_URL = /^https?:\/\/(?:[a-z0-9-]+\.)*maker-5\.cloud\/t\/([0-9a-z]{6})\/?$/i;
+const OUR_URL = /^https?:\/\/(?:[a-z0-9-]+\.)*(?:maker5\.cloud|maker-5\.cloud|amplifyapp\.com)\/t\/([0-9a-z]{6})\/?$/i;
 const LOCAL_URL = /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?\/t\/([0-9a-z]{6})\/?$/i;
 
 /**

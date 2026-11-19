@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ARTICLE, UNIT, Refused, UNIT_STEP, articleFields, counts, mintId, qty, wouldLoop, type Article } from "./stock";
+import { ARTICLE, BOX, MAX_BOX_DEPTH, UNIT, Refused, boxFields, boxFits, boxable, fileName, linkFields, UNIT_STEP, articleFields, counts, mintId, qty, wouldLoop, type Article } from "./stock";
 
 // Stock rules (ADR-0008, ADR-0010 in maker-5-shared).
 
@@ -43,4 +43,40 @@ test("a unit cannot be installed in itself, however deep", () => {
   assert.equal(wouldLoop("pi", "card", (id) => parents[id]), true, "the Pi into the card that sits in it");
   assert.equal(wouldLoop("case", "card", (id) => parents[id]), true);
   assert.equal(wouldLoop("x", "x", () => undefined), true);
+});
+
+// Boxes (ADR-0011 in maker-5-shared). Every name here is invented.
+
+test("a box is minted, named and of a known kind", () => {
+  assert.match(mintId("x"), BOX);
+  assert.deepEqual(boxFields({ name: "  Doorbell   prototype ", kind: "box", location: "Shelf B" }),
+    { name: "Doorbell prototype", kind: "box", spaceId: undefined, location: "Shelf B", note: undefined });
+  assert.throws(() => boxFields({ name: "" }), Refused);
+  assert.throws(() => boxFields({ name: "Crate", kind: "crate" }), Refused);
+});
+
+test("a box never goes inside itself, and nests at most eight deep", () => {
+  const up: Record<string, string> = { "x-b": "x-a", "x-c": "x-b" };
+  const parentOf = (id: string) => up[id];
+  assert.equal(boxFits("x-d", "x-c", parentOf), null);
+  assert.match(boxFits("x-a", "x-c", parentOf) ?? "", /inside itself/);
+  const deep: Record<string, string> = {};
+  for (let i = 1; i < MAX_BOX_DEPTH + 2; i++) deep[`x-${i}`] = `x-${i - 1}`;
+  assert.match(boxFits("x-new", `x-${MAX_BOX_DEPTH + 1}`, (id) => deep[id]) ?? "", /at most/);
+});
+
+test("boxes never hold more of an article than is on hand", () => {
+  assert.ok(boxable({ onHand: 10 }, 10));
+  assert.ok(boxable({ onHand: 10, boxed: 4 }, 6));
+  assert.ok(!boxable({ onHand: 10, boxed: 4 }, 7));
+});
+
+test("links are https, of a known kind; file names lose their path", () => {
+  assert.deepEqual(linkFields({ url: "https://example.org/doorbell/firmware", kind: "firmware" }),
+    { url: "https://example.org/doorbell/firmware", kind: "firmware", title: "example.org/doorbell/firmware" });
+  assert.throws(() => linkFields({ url: "http://example.org/x" }), Refused);
+  assert.throws(() => linkFields({ url: "https://example.org/x", kind: "music" }), Refused);
+  assert.equal(fileName("C:\\work\\doorbell.step"), "doorbell.step");
+  assert.equal(fileName("../../etc/passwd"), "passwd");
+  assert.throws(() => fileName("   "), Refused);
 });

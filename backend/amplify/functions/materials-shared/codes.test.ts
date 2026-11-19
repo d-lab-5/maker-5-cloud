@@ -10,13 +10,19 @@ test("our codes: minted in Crockford base32, read back however they arrive", () 
   assert.deepEqual(normalise("HTTPS://MAKER-5.CLOUD/T/K7Q2M9"), { kind: "m5", value: "K7Q2M9" });
   assert.deepEqual(normalise("https://stage.maker-5.cloud/t/k7q2m9/"), { kind: "m5", value: "K7Q2M9" });
   assert.deepEqual(normalise("http://localhost:8000/t/K7Q2M9"), { kind: "m5", value: "K7Q2M9" });
+  assert.deepEqual(normalise("HTTPS://MAKER5.CLOUD/T/K7Q2M9"), { kind: "m5", value: "K7Q2M9" });
+  assert.deepEqual(normalise("https://stage.maker5.cloud/t/k7q2m9"), { kind: "m5", value: "K7Q2M9" });
+  assert.deepEqual(normalise("https://stage.d0example0.amplifyapp.com/t/K7Q2M9"), { kind: "m5", value: "K7Q2M9" });
+  assert.equal(normalise("https://maker5.cloud.example.org/t/K7Q2M9").kind, "qr", "a look-alike host is text");
   assert.deepEqual(normalise("k7q2mo"), { kind: "m5", value: "K7Q2M0" }, "O is read as 0");
   assert.equal(normalise("https://example.org/t/K7Q2M9").kind, "qr", "another site's URL is just text");
 });
 
 test("the label URL fits a version-2 QR in alphanumeric mode", () => {
   const url = labelUrl("K7Q2M9");
-  assert.equal(url, "HTTPS://MAKER-5.CLOUD/T/K7Q2M9");
+  assert.equal(url, "HTTPS://MAKER5.CLOUD/T/K7Q2M9");
+  assert.equal(labelUrl("K7Q2M9", "stage.maker5.cloud"), "HTTPS://STAGE.MAKER5.CLOUD/T/K7Q2M9");
+  assert.ok(labelUrl("K7Q2M9", "stage.maker5.cloud").length <= 47, "stage labels fit version 2 too");
   assert.match(url, /^[0-9A-Z $%*+\-./:]+$/, "only QR alphanumeric characters");
   assert.ok(url.length <= 47, "version 2 at ECC L holds 47 alphanumeric characters");
 });

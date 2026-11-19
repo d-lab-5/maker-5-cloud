@@ -4,6 +4,9 @@ import { Shell } from "../components/Shell";
 import { getSpace } from "../lib/data";
 import type { Space } from "../lib/data";
 import { SpaceMaterials } from "../components/SpaceMaterials";
+import { useT } from "../lib/i18n";
+import { workspaceName } from "../lib/names";
+import * as m from "../lib/materials";
 
 /**
  * Every route under /w/.
@@ -13,7 +16,7 @@ import { SpaceMaterials } from "../components/SpaceMaterials";
  * authenticated per-group data in S3, so there is nothing to statically
  * render. The id and the view come out of the URL at runtime.
  *
- * ONE page component for all five views rather than five matchPath routes.
+ * ONE page component for all its views rather than five matchPath routes.
  * The alternative needs a hosting rewrite per route (constraint 11 in the dlab5-cloud-template skill)
  * — configuration that lives outside this repository and that nobody will
  * remember to add.
@@ -24,14 +27,7 @@ import { SpaceMaterials } from "../components/SpaceMaterials";
  * route a space has in one screenful.
  */
 
-const VIEWS = [
-  "overview",
-  "items",
-  "materials",
-  "reports",
-  "import",
-  "export",
-] as const;
+const VIEWS = ["overview", "materials"] as const;
 
 type View = (typeof VIEWS)[number];
 
@@ -54,6 +50,7 @@ function parse(pathname: string): { id?: string; view: View } {
 
 const SpacePage: React.FC<PageProps> = ({ location }) => {
   const { id, view } = parse(location.pathname);
+  const { t } = useT();
 
   const [space, setSpace] = React.useState<Space | null>(null);
   const [state, setState] = React.useState<"loading" | "ready" | "denied">(
@@ -111,112 +108,77 @@ const SpacePage: React.FC<PageProps> = ({ location }) => {
   return (
     <Shell space={{ id, name: space.name, active: view }}>
       <div className="mk-pagehead">
-        <h1>{LABELS[view]}</h1>
-        <span className="mk-muted">{space.tenantName ? `${space.tenantName} · ` : ""}{space.name}</span>
+        <h1>{workspaceName(space, t)}</h1>
+        {space.tenantName && <span className="mk-chip">{space.tenantName}</span>}
+        <span className="mk-muted">{t(`ws.view.${view}`)}</span>
       </div>
       <ViewBody view={view} space={space} />
     </Shell>
   );
 };
 
-const LABELS: Record<View, string> = {
-  overview: "Overview",
-  items: "Items",
-  materials: "Materials",
-  reports: "Reports",
-  import: "Import",
-  export: "Export",
-};
-
-/**
- * The placeholders.
- *
- * Each one names what belongs there rather than saying "TODO". A placeholder
- * with no content is a placeholder that gets deleted and reinvented.
- */
 function ViewBody({ view, space }: { view: View; space: Space }) {
   switch (view) {
     case "overview":
-      return (
-        <div className="mk-panel">
-          <h2 className="mk-panel__title">This space at a glance</h2>
-          <dl className="mk-stats">
-            <div className="mk-stat">
-              <dt>{space.kind}</dt>
-              <dd>Kind</dd>
-            </div>
-            <div className="mk-stat">
-              <dt>{space.tenantName ?? "—"}</dt>
-              <dd>Tenant</dd>
-            </div>
-          </dl>
-          <p className="mk-panel__hint">
-            The space&rsquo;s object lives in S3 at <code>spaces/{space.id}/data.json</code>{" "}
-            and is read through <code>loadObject()</code> in{" "}
-            <code>src/lib/data.ts</code>, which returns the content and the ETag
-            a later save must present. What the tenant <em>knows</em> about the
-            space is its A-Box: <code>loadGraph(space.id)</code>, synced with
-            the tenant&rsquo;s edges. Build the real screen on those.
-          </p>
-        </div>
-      );
-
-    case "items":
-      return (
-        <div className="mk-panel">
-          <h2 className="mk-panel__title">Whatever this app is about</h2>
-          <p className="mk-panel__hint">
-            The space&rsquo;s own content: the list, the board, the canvas.
-            It comes from <code>loadObject()</code>, is edited in memory, and
-            goes back through <code>saveObject(id, value, etag)</code>. Handle
-            the rejected save — objectProxy throws a message that already tells
-            the reader to reload — because that is the case a demo never hits
-            and a second user hits on their first afternoon.
-          </p>
-        </div>
-      );
-
+      return <Overview space={space} />;
     case "materials":
       return <SpaceMaterials space={space} />;
-
-    case "reports":
-      return (
-        <div className="mk-panel">
-          <h2 className="mk-panel__title">Derived views</h2>
-          <p className="mk-panel__hint">
-            Anything computed from the space rather than stored in it.
-            Compute it in <code>@dlab5/maker-5-core</code> rather than in the
-            component: it is then testable with <code>node --test</code>, and a
-            future Lambda or CLI can produce the same answer.
-          </p>
-        </div>
-      );
-
-    case "import":
-      return (
-        <div className="mk-panel">
-          <h2 className="mk-panel__title">Getting things in</h2>
-          <p className="mk-panel__hint">
-            Parse in <code>@dlab5/maker-5-core</code>, validate at the boundary with{" "}
-            <code>assertSpace</code>-style checks that report every problem
-            at once, and only then write — a parser that reports one problem
-            per attempt turns a bad file into a sequence of guesses.
-          </p>
-        </div>
-      );
-
-    case "export":
-      return (
-        <div className="mk-panel">
-          <h2 className="mk-panel__title">Getting things out</h2>
-          <p className="mk-panel__hint">
-            A round trip that is only ever tested against itself proves nothing.
-            Export, re-import under a fresh id, export THAT and compare byte for
-            byte — going back out through storage is the point.
-          </p>
-        </div>
-      );
   }
+}
+
+/**
+ * A workspace at a glance (ADR-0011): its boxes, and the links and files kept
+ * in them, so the firmware and CAD of a product are one click from its page.
+ */
+function Overview({ space }: { space: Space }) {
+  const { t } = useT();
+  const [boxes, setBoxes] = React.useState<m.BoxDetail[] | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    m.boxes(space.tenantId, "", space.id)
+      .then((list) => Promise.all(list.slice(0, 40).map((b) => m.box(space.tenantId, b.id))))
+      .then(setBoxes)
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
+  }, [space.id, space.tenantId]);
+  const links = (boxes ?? []).flatMap((d) => (d.box.links ?? []).map((l) => ({ ...l, box: d.box })));
+  const files = (boxes ?? []).flatMap((d) => (d.box.files ?? []).map((f) => ({ ...f, box: d.box })));
+  const open = async (boxId: string, fileId: string) => window.location.assign((await m.fileUrl(space.tenantId, boxId, fileId)).url);
+  return (
+    <>
+      <div className="mk-panel">
+        <h2 className="mk-panel__title">{t("ws.boxes")}</h2>
+        {error && <p className="mk-error" role="alert">{error}</p>}
+        {!boxes && !error && <p className="mk-muted">…</p>}
+        {boxes?.length === 0 && <p className="mk-panel__hint">{t("ws.boxes.none")} <a href={`/materials/?w=${space.tenantId}&tab=boxes`}>{t("bx.tab")}</a></p>}
+        <ul className="mk-boxlist">
+          {boxes?.map((d) => (
+            <li key={d.box.id} className="mk-boxlist__row">
+              <span><span aria-hidden="true">📦 </span><a href={m.boxHref(space.tenantId, d.box.id)}><strong>{d.box.name}</strong></a>
+                <span className="mk-muted"> · {d.path.length ? d.path.map((p) => p.name).join(" › ") : d.box.location ?? t(`bx.kind.${d.box.kind}`)}</span></span>
+              <span className="mk-muted">{t("ws.boxes.count", { n: d.units.length + d.lines.length + d.boxes.length })}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      {(links.length > 0 || files.length > 0) && (
+        <div className="mk-panel">
+          <h2 className="mk-panel__title">{t("bx.artifacts")}</h2>
+          <ul className="mk-boxlist">
+            {links.map((l) => (
+              <li key={`${l.box.id}-${l.id}`}><span className="mk-chip">{t(`bx.link.${l.kind}`)}</span>{" "}
+                <a href={l.url} target="_blank" rel="noreferrer noopener">{l.title}</a><span className="mk-muted"> · {l.box.name}</span></li>
+            ))}
+            {files.map((f) => (
+              <li key={`${f.box.id}-${f.id}`}><span className="mk-chip">{t(`bx.link.${f.kind}`)}</span>{" "}
+                <button type="button" className="mk-linkbutton" onClick={() => void open(f.box.id, f.id)}>{f.name}</button>
+                <span className="mk-muted"> · {f.box.name}</span></li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <SpaceMaterials space={space} />
+    </>
+  );
 }
 
 export default SpacePage;

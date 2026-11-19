@@ -35,6 +35,12 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
       case "unit": return json(200, await st.unit(actor, tenant, String(b.id ?? "")));
       case "resolve": return json(200, await st.resolve(actor, String(b.code ?? "")));
       case "product": return json(200, await st.spaceMaterials(actor, String(b.spaceId ?? "")));
+      // boxes, read only: the bench asks where a part is and where its files are
+      case "boxes": return json(200, { boxes: await st.listBoxes(actor, tenant, String(b.q ?? ""), String(b.spaceId ?? "")) });
+      case "box": {
+        const { box, ...rest } = await st.box(actor, tenant, String(b.id ?? ""));
+        return json(200, { ...rest, box: { ...box, files: (box.files ?? []).map(({ id, name, kind, size }) => ({ id, name, kind, size })) } });
+      }
       case "reserve": case "release": case "return":
         return json(200, await st.step(actor, route, String(b.spaceId ?? ""), String(b.articleId ?? ""), b));
       default: return json(404, { error: "not_found" });

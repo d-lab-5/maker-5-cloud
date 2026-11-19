@@ -6,6 +6,8 @@ import { History } from "../components/History";
 import * as m from "../lib/materials";
 import type { Article, StockWorkspace } from "../lib/materials";
 import { useT } from "../lib/i18n";
+import { EditBox } from "../components/BoxCard";
+import { listSpaces, type Space } from "../lib/data";
 
 /**
  * A workspace's stock (ADR-0008 in maker-5-shared): the catalogue of every
@@ -15,6 +17,7 @@ import { useT } from "../lib/i18n";
  * parts in their own Materials view (/w/<id>/materials/).
  *
  *   /materials/?w=<tenant>&a=<article>
+ *   /materials/?w=<tenant>&tab=boxes          the organisation's boxes (ADR-0011)
  */
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -37,6 +40,7 @@ const MaterialsPage: React.FC<PageProps> = () => {
   const [labels, setLabels] = React.useState<{ items: LabelItem[]; layout: Layout } | null>(null);
   const [blank, setBlank] = React.useState(24);
   const [error, setError] = React.useState<string | null>(null);
+  const [tab, setTab] = React.useState<"stock" | "boxes">(params().get("tab") === "boxes" ? "boxes" : "stock");
 
   React.useEffect(() => {
     m.stockWorkspaces().then((ws) => {
@@ -50,7 +54,7 @@ const MaterialsPage: React.FC<PageProps> = () => {
     m.articles(w, q, cat).then(setList).catch((e) => setError(message(e)));
   }, [w, q, cat]);
   React.useEffect(() => { const id = window.setTimeout(load, q ? 250 : 0); return () => window.clearTimeout(id); }, [load, q]);
-  React.useEffect(() => { if (w) setParams({ w, a: open || undefined }); }, [w, open]);
+  React.useEffect(() => { if (w) setParams({ w, a: open || undefined, tab: tab === "boxes" ? "boxes" : undefined }); }, [w, open, tab]);
 
   const ws = workspaces?.find((x) => x.id === w);
   const admin = Boolean(ws?.admin);
@@ -76,6 +80,13 @@ const MaterialsPage: React.FC<PageProps> = () => {
       </div>
       {workspaces?.length === 0 && <div className="mk-empty"><p>{t("mt.noworkspace")}</p></div>}
       {w && (
+        <nav className="mk-tabs mk-noprint" role="tablist">
+          <button type="button" role="tab" aria-selected={tab === "stock"} className={tab === "stock" ? "mk-tab mk-tab--on" : "mk-tab"} onClick={() => setTab("stock")}>{t("bx.tab.stock")}</button>
+          <button type="button" role="tab" aria-selected={tab === "boxes"} className={tab === "boxes" ? "mk-tab mk-tab--on" : "mk-tab"} onClick={() => setTab("boxes")}>{t("bx.tab")}</button>
+        </nav>
+      )}
+      {w && tab === "boxes" && <BoxesPanel tenantId={w} admin={admin} onLabels={(items) => setLabels({ items, layout: "box" })} />}
+      {w && tab === "stock" && (
         <div className="mk-noprint">
           <div className="mk-panel">
             <p className="mk-panel__hint">{t("mt.hint")}</p>
@@ -132,6 +143,75 @@ const MaterialsPage: React.FC<PageProps> = () => {
     </Shell>
   );
 };
+
+/** The organisation's boxes: find one, make one, print their labels. */
+function BoxesPanel({ tenantId, admin, onLabels }: { tenantId: string; admin: boolean; onLabels: (items: LabelItem[]) => void }) {
+  const { t } = useT();
+  const [list, setList] = React.useState<m.Box[] | null>(null);
+  const [spaces, setSpaces] = React.useState<Space[]>([]);
+  const [q, setQ] = React.useState("");
+  const [adding, setAdding] = React.useState(false);
+  const [picked, setPicked] = React.useState<Set<string>>(new Set());
+  const [error, setError] = React.useState<string | null>(null);
+  const load = React.useCallback(() => { m.boxes(tenantId, q).then(setList).catch((e) => setError(message(e))); }, [tenantId, q]);
+  React.useEffect(() => { const id = window.setTimeout(load, q ? 250 : 0); return () => window.clearTimeout(id); }, [load, q]);
+  React.useEffect(() => { void listSpaces().then((vs) => setSpaces(vs.filter((v) => v.tenantId === tenantId))); }, [tenantId]);
+  const spaceName = (id?: string) => spaces.find((v) => v.id === id)?.name;
+  const run = async (fn: () => Promise<unknown>) => {
+    setError(null);
+    try { await fn(); return true; } catch (e) { setError(message(e)); return false; }
+  };
+  /** Each chosen box's own code, minting and binding one where a box has none. */
+  const print = () => run(async () => {
+    const chosen = (list ?? []).filter((b) => picked.has(b.id));
+    const items: LabelItem[] = [];
+    for (const b of chosen) {
+      const d = await m.box(tenantId, b.id);
+      let code = d.codes.find((c) => c.kind === "m5")?.value;
+      if (!code) {
+        code = (await m.mintCodes(tenantId, 1))[0].code;
+        await m.bindCode(tenantId, code, "box", b.id);
+      }
+      items.push({ code, title: b.name, sub: spaceName(b.spaceId) ?? b.location ?? "" });
+    }
+    onLabels(items);
+  });
+  const toggle = (id: string) => { const n = new Set(picked); if (n.has(id)) n.delete(id); else n.add(id); setPicked(n); };
+  return (
+    <div className="mk-noprint">
+      <div className="mk-panel">
+        <p className="mk-panel__hint">{t("bx.hint")}</p>
+        <div className="mk-toolbar">
+          <input className="mk-input" type="search" placeholder={t("bx.search")} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t("bx.search")} />
+          <button type="button" className="mk-button" onClick={() => setAdding(!adding)}>{t("bx.new")}</button>
+          {admin && <button type="button" className="mk-button mk-button--ghost" disabled={!picked.size} onClick={() => void print()}>{t("bx.labels", { n: picked.size })}</button>}
+        </div>
+        {adding && <EditBox tenantId={tenantId} spaces={spaces} run={run}
+          onSaved={(b) => { setAdding(false); window.location.assign(m.boxHref(tenantId, b.id)); }} />}
+        {error && <p className="mk-error" role="alert">{error}</p>}
+        <table className="mk-table">
+          <thead><tr>
+            {admin && <th aria-label={t("bx.pick")} />}
+            <th>{t("bx.f.name")}</th><th>{t("bx.where")}</th><th>{t("shell.space")}</th><th className="mk-num">{t("bx.artifacts")}</th>
+          </tr></thead>
+          <tbody>
+            {list?.map((b) => (
+              <tr key={b.id}>
+                {admin && <td><input type="checkbox" checked={picked.has(b.id)} onChange={() => toggle(b.id)} aria-label={b.name} /></td>}
+                <td><a href={m.boxHref(tenantId, b.id)}><strong>{b.name}</strong></a> <span className="mk-muted">· {t(`bx.kind.${b.kind}`)}</span></td>
+                <td>{b.parentName ? `${t("bx.inbox")} ${b.parentName}` : b.location ?? "—"}</td>
+                <td>{spaceName(b.spaceId) ?? "—"}</td>
+                <td className="mk-num">{Number(b.links ?? 0) + Number(b.files ?? 0) || ""}</td>
+              </tr>
+            ))}
+            {list?.length === 0 && <tr><td colSpan={5} className="mk-muted">{q ? t("mt.nomatch") : t("bx.none")}</td></tr>}
+            {!list && !error && <tr><td colSpan={5} className="mk-muted">…</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 function ArticleForm({ tenantId, article, onDone }: { tenantId: string; article?: Article; onDone: (a: Article | null) => void }) {
   const { t } = useT();

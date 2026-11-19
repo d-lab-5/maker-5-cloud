@@ -8,7 +8,10 @@
 //   reserve, release, consume, return     a reader of that product, or a workspace admin
 //   move, install, flash, bind a code     anyone in the workspace (for a unit with a product: its readers)
 //   the catalogue, receive, adjust,
-//   retire, mint and unbind codes         the workspace's admins, with two-step sign-in
+//   retire, mint and unbind codes,
+//   delete a box                          the organisation's admins, with two-step sign-in
+//   boxes: make, move, check in and out,
+//   links and files                       anyone in the organisation
 
 import type { AppSyncIdentityCognito, AppSyncResolverEvent } from "aws-lambda";
 import { claimsOf, tenantsOf } from "../shared/claims";
@@ -19,7 +22,7 @@ import type { Step } from "../materials-shared/stock";
 
 type Args = { op?: string; args?: string | Record<string, unknown> };
 
-const ADMIN_OPS = new Set(["saveArticle", "receive", "adjust", "retire", "mintCodes", "unbindCode"]);
+const ADMIN_OPS = new Set(["saveArticle", "receive", "adjust", "retire", "mintCodes", "unbindCode", "deleteBox"]);
 
 export const handler = async (event: AppSyncResolverEvent<Args>) => {
   const { groups, userPoolId, username } = claimsOf(event.identity);
@@ -61,6 +64,20 @@ export const handler = async (event: AppSyncResolverEvent<Args>) => {
       case "mintCodes": return await st.mintCodes(actor, t, Number(a.n));
       case "bindCode": return await st.bindCode(actor, t, String(a.code), String(a.kind), String(a.id));
       case "unbindCode": return await st.unbindCode(actor, t, String(a.code));
+      // boxes (ADR-0011): anyone in the organisation; deleting one is an admin's
+      case "boxes": return await st.listBoxes(actor, t, String(a.q ?? ""), String(a.spaceId ?? ""));
+      case "box": return await st.box(actor, t, String(a.id));
+      case "saveBox": return await st.saveBox(actor, t, a.box ?? {});
+      case "moveBox": return await st.moveBox(actor, t, String(a.id), a);
+      case "deleteBox": return await st.deleteBox(actor, t, String(a.id));
+      case "checkIn": return await st.checkIn(actor, t, String(a.boxId), a);
+      case "checkOut": return await st.checkOut(actor, t, String(a.boxId), a);
+      case "addLink": return await st.addLink(actor, t, String(a.boxId), a.link ?? {});
+      case "removeLink": return await st.removeLink(actor, t, String(a.boxId), String(a.linkId));
+      case "uploadFile": return await st.uploadFile(actor, t, String(a.boxId), a);
+      case "fileUploaded": return await st.fileUploaded(actor, t, String(a.boxId), a);
+      case "fileUrl": return await st.fileUrl(actor, t, String(a.boxId), String(a.fileId));
+      case "removeFile": return await st.removeFile(actor, t, String(a.boxId), String(a.fileId));
       default: throw new st.Refused(`No operation ${op}.`);
     }
   } catch (err) {

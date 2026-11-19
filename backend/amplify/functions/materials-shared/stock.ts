@@ -11,10 +11,11 @@ import { randomInt } from "node:crypto";
 export class Refused extends Error {}
 
 const ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz";
-export const mintId = (prefix: "a" | "u") =>
+export const mintId = (prefix: "a" | "u" | "x") =>
   `${prefix}-${Array.from({ length: 10 }, () => ALPHABET[randomInt(ALPHABET.length)]).join("")}`;
 export const ARTICLE = /^a-[23456789abcdefghjkmnpqrstuvwxyz]{10}$/;
 export const UNIT = /^u-[23456789abcdefghjkmnpqrstuvwxyz]{10}$/;
+export const BOX = /^x-[23456789abcdefghjkmnpqrstuvwxyz]{10}$/;
 
 export const CATEGORIES = ["compute", "storage", "electronic", "mechanical", "cable", "consumable", "tool", "other"] as const;
 export const TRACKING = ["bulk", "serial"] as const;
@@ -26,10 +27,14 @@ export interface Article {
   tenantId: string; id: string; name: string; category: string; tracking: Tracking; unit: string;
   manufacturer?: string; mpn?: string; minStock?: number; location?: string; note?: string; datasheet?: string;
   onHand: number; reserved: number; free: number;
+  /** How many of onHand sit in boxes (ADR-0011); never more than onHand. */
+  boxed?: number;
 }
 export interface Unit {
   tenantId: string; id: string; articleId: string; serial?: string; state: (typeof UNIT_STATES)[number];
   spaceId?: string; parentId?: string; location?: string;
+  /** The box it is in (ADR-0011), or who has it out of one. */
+  boxId?: string; holder?: { by: string; at: string }; name?: string;
   firmware?: { name: string; version: string; at: string; by: string };
 }
 
@@ -98,3 +103,73 @@ export const UNIT_STEP: Record<Step, { from: Unit["state"]; to: Unit["state"] }>
   consume: { from: "reserved", to: "in-use" },
   return: { from: "in-use", to: "in-stock" },
 };
+
+/* --------------------------------------------------------------- boxes ---- *
+ * A box (ADR-0011 in maker-5-shared) is a cardboard box, a bag, a folder, a
+ * drawer or a shelf: something with a large label that holds units, counted
+ * parts and other boxes, and keeps the links and files of what is in it.
+ */
+
+export const BOX_KINDS = ["box", "bag", "folder", "drawer", "shelf"] as const;
+export const LINK_KINDS = ["firmware", "cad", "schematic", "datasheet", "docs", "repo", "other"] as const;
+export const MAX_BOX_DEPTH = 8;
+export const MAX_LINKS = 30;
+export const MAX_FILES = 50;
+export const MAX_FILE_BYTES = 50 * 1024 * 1024;
+
+export interface BoxLink { id: string; kind: (typeof LINK_KINDS)[number]; title: string; url: string; at: string; by: string }
+export interface BoxFile { id: string; kind: (typeof LINK_KINDS)[number]; name: string; size: number; type: string; at: string; by: string }
+export interface Box {
+  tenantId: string; id: string; name: string; kind: (typeof BOX_KINDS)[number];
+  parentId?: string; location?: string; spaceId?: string; note?: string;
+  links?: BoxLink[]; files?: BoxFile[];
+}
+
+/** The fields a person sets on a box; where it sits is moveBox's. */
+export function boxFields(b: Record<string, unknown>, existing?: Box) {
+  const name = text(b.name ?? existing?.name, 120);
+  if (!name) throw new Refused("A box needs a name.");
+  const kind = String(b.kind ?? existing?.kind ?? "box");
+  if (!(BOX_KINDS as readonly string[]).includes(kind)) throw new Refused(`No box kind ${kind}.`);
+  const spaceId = b.spaceId === undefined ? existing?.spaceId : text(b.spaceId, 40);
+  return {
+    name, kind: kind as Box["kind"], spaceId,
+    location: text(b.location ?? existing?.location, 80),
+    note: text(b.note ?? existing?.note, 1000),
+  };
+}
+
+/** A link a person adds to a box: an https URL of one of the known kinds. */
+export function linkFields(l: Record<string, unknown>) {
+  const url = String(l.url ?? "").trim();
+  if (!/^https:\/\/[^\s]{3,}$/.test(url) || url.length > 1000) throw new Refused("A link is an https:// address.");
+  const kind = String(l.kind ?? "other");
+  if (!(LINK_KINDS as readonly string[]).includes(kind)) throw new Refused(`No link kind ${kind}.`);
+  const title = text(l.title, 120) ?? url.replace(/^https:\/\//, "").slice(0, 120);
+  return { url, kind: kind as BoxLink["kind"], title };
+}
+
+/** A file's name as it is kept: no path, no control characters. */
+export function fileName(name: unknown) {
+  const n = String(name ?? "").split(/[\\/]/).pop()!.replace(/[\u0000-\u001f"]/g, "").trim().slice(0, 160);
+  if (!n) throw new Refused("A file needs a name.");
+  return n;
+}
+
+/**
+ * Can `boxId` go into `parentId`? Not into itself or anything inside it, and
+ * not deeper than MAX_BOX_DEPTH. `parentOf` walks up from the new parent.
+ */
+export function boxFits(boxId: string, parentId: string, parentOf: (id: string) => string | undefined): string | null {
+  let at: string | undefined = parentId;
+  let depth = 1;
+  for (; at; depth++) {
+    if (at === boxId) return "A box cannot go inside itself.";
+    if (depth >= MAX_BOX_DEPTH) return `Boxes nest at most ${MAX_BOX_DEPTH} deep.`;
+    at = parentOf(at);
+  }
+  return null;
+}
+
+/** May `q` more of an article go into boxes? Boxes never hold more than is on hand. */
+export const boxable = (a: Pick<Article, "onHand" | "boxed">, q: number) => (a.boxed ?? 0) + q <= a.onHand;

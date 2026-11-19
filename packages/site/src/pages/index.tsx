@@ -6,9 +6,10 @@ import { useSession } from "../components/AuthGate";
 import { listSpaces } from "../lib/data";
 import type { Space } from "../lib/data";
 import { useT } from "../lib/i18n";
+import { byOrganisation, workspaceName } from "../lib/names";
 
 /**
- * The launcher: the spaces this person can open, grouped by tenant.
+ * The launcher: the workspaces this person can open, under their organisation's name.
  *
  * Reached only after AuthGate has a session, so there is no signed-out branch
  * to handle here — and no page below needs one either. That is the whole point
@@ -30,7 +31,6 @@ const IndexPage: React.FC<PageProps> = () => {
       .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
   }, []);
 
-  const tenants = [...new Set((spaces ?? []).map((s) => s.tenantName ?? s.tenantId))];
 
   return (
     <Shell title={t("nav.spaces")}>
@@ -70,20 +70,23 @@ const IndexPage: React.FC<PageProps> = () => {
         </div>
       )}
 
-      {spaces && spaces.length > 0 && (
-        <ul className="mk-cards">
-          {spaces.map((space) => (
-            <li key={space.id}>
-              <a className="mk-card" href={`/w/${space.id}/`}>
-                <span className="mk-card__title">{space.kind === "private" ? "🔒 " : ""}{space.name}</span>
-                {/* The id, deliberately not shown. ADR-0003: never render an id
-                    where a name belongs. */}
-                {tenants.length > 1 && space.tenantName && <span className="mk-card__meta">{space.tenantName}</span>}
-              </a>
-            </li>
-          ))}
-        </ul>
-      )}
+      {spaces && spaces.length > 0 && byOrganisation(spaces).map((org) => (
+        <section key={org.id} className="mk-org">
+          <h2 className="mk-org__name">{org.name}</h2>
+          <ul className="mk-cards">
+            {org.spaces.map((space) => (
+              <li key={space.id}>
+                <a className="mk-card" href={`/w/${space.id}/`}>
+                  {/* The id, deliberately not shown. ADR-0003: never render an id
+                      where a name belongs. */}
+                  <span className="mk-card__title">{space.kind === "private" ? "🔒 " : ""}{workspaceName(space, t)}</span>
+                  {space.kind === "shared" && <span className="mk-card__meta">{t("space.shared.hint")}</span>}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
     </Shell>
   );
 };

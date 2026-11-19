@@ -10,19 +10,22 @@ import { useT } from "../lib/i18n";
  *   tiny      10 mm QR and its code: an SD card, a SIM, a cable end
  *   tag       20 mm QR, code and name: a part bag, a board
  *   article   70 × 37 mm: QR, name, part number, code (24 a sheet)
+ *   box       95 × 65 mm: a 40 mm QR, the box's name large, its workspace
+ *             and code (8 a sheet), for a carton, a bag, a drawer
  *
- * The QR holds HTTPS://MAKER-5.CLOUD/T/<code>: version 2 at L for tiny,
+ * The QR holds HTTPS://<this site's host>/T/<code>: version 2 at L for tiny,
  * which is 25 modules in 10 mm (0.4 mm each, fine for a 600 dpi laser).
  * Print at 100 % ("actual size"), never "fit to page".
  */
 
 export interface LabelItem { code: string; title?: string; sub?: string }
-export type Layout = "tiny" | "tag" | "article";
+export type Layout = "tiny" | "tag" | "article" | "box";
 
 const SIZE: Record<Layout, { qr: number; ecc: "L" | "M" }> = {
   tiny: { qr: 10, ecc: "L" },
   tag: { qr: 20, ecc: "M" },
   article: { qr: 25, ecc: "M" },
+  box: { qr: 40, ecc: "M" },
 };
 
 export function LabelSheet({ items, layout, onClose }: { items: LabelItem[]; layout: Layout; onClose: () => void }) {
@@ -42,6 +45,7 @@ export function LabelSheet({ items, layout, onClose }: { items: LabelItem[]; lay
           <option value="tiny">{t("lb.tiny")}</option>
           <option value="tag">{t("lb.tag")}</option>
           <option value="article">{t("lb.article")}</option>
+          <option value="box">{t("lb.box")}</option>
         </select>
         <label className="mk-muted">{t("lb.skip")}{" "}
           <input className="mk-input mk-input--num" type="number" min={0} max={200} value={skip}
@@ -61,7 +65,7 @@ export function LabelSheet({ items, layout, onClose }: { items: LabelItem[]; lay
             <div className="mk-label__text">
               <span className="mk-label__code">{x.code}</span>
               {kind !== "tiny" && x.title && <span className="mk-label__title">{x.title}</span>}
-              {kind === "article" && x.sub && <span className="mk-label__sub">{x.sub}</span>}
+              {(kind === "article" || kind === "box") && x.sub && <span className="mk-label__sub">{x.sub}</span>}
             </div>
           </div>
         ))}
