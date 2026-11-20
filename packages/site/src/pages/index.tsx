@@ -3,13 +3,19 @@ import type { HeadFC, PageProps } from "gatsby";
 import { Link } from "gatsby";
 import { Shell } from "../components/Shell";
 import { useSession } from "../components/AuthGate";
-import { listSpaces } from "../lib/data";
+import { graphActivity, listSpaces } from "../lib/data";
 import type { Space } from "../lib/data";
 import { useT } from "../lib/i18n";
 import { byOrganisation, workspaceName } from "../lib/names";
+import { ACTIVE_DAYS, ago, split, type Activity } from "../lib/activity";
+
+const ORG_KEY = "mk-org";
 
 /**
- * The launcher: the workspaces this person can open, under their organisation's name.
+ * The launcher: the workspaces of the active organisation, split into active
+ * (an edge used them in the last 14 days) and passive (ADR-0018 in
+ * maker-5-shared). Someone in several organisations picks one; the choice is
+ * kept in this browser.
  *
  * Reached only after AuthGate has a session, so there is no signed-out branch
  * to handle here — and no page below needs one either. That is the whole point
@@ -24,12 +30,48 @@ const IndexPage: React.FC<PageProps> = () => {
   const { t } = useT();
   const [spaces, setSpaces] = React.useState<Space[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [orgId, setOrgId] = React.useState<string>(() => {
+    try { return window.localStorage.getItem(ORG_KEY) || ""; } catch { return ""; }
+  });
+  const [activity, setActivity] = React.useState<Record<string, Activity>>({});
 
   React.useEffect(() => {
     listSpaces()
       .then(setSpaces)
       .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
   }, []);
+
+  const orgs = React.useMemo(() => (spaces ? byOrganisation(spaces) : []), [spaces]);
+  const org = orgs.find((o) => o.id === orgId) ?? orgs[0];
+  const choose = (id: string) => {
+    setOrgId(id);
+    try { window.localStorage.setItem(ORG_KEY, id); } catch { /* private window */ }
+  };
+
+  React.useEffect(() => {
+    if (!org) return;
+    setActivity({});
+    graphActivity(org.id).then(setActivity).catch(() => setActivity({}));
+  }, [org?.id]);
+
+  const halves = org ? split(org.spaces, activity) : { active: [], passive: [] };
+  const when = (iso?: string | null) => { const a = ago(iso); return a ? t(a.key, { n: a.n }) : ""; };
+  const card = (space: Space) => {
+    const a = activity[space.id];
+    const counts = a && (a.blocks || a.modules) ? t("home.counts", { blocks: a.blocks ?? 0, modules: a.modules ?? 0 }) : "";
+    return (
+      <li key={space.id}>
+        <a className="mk-card" href={`/w/${space.id}/`}>
+          {/* The id, deliberately not shown. ADR-0003: never render an id
+              where a name belongs. */}
+          <span className="mk-card__title">{space.kind === "private" ? "🔒 " : ""}{workspaceName(space, t)}</span>
+          {a?.edgeSeenAt && <span className="mk-card__meta">{t("home.edgeUsed", { edge: a.edgeSeenName || t("home.anEdge"), when: when(a.edgeSeenAt) })}</span>}
+          {a?.updatedAt && <span className="mk-card__meta">{t("home.changed", { when: when(a.updatedAt) })}{counts ? ` · ${counts}` : ""}</span>}
+          {!a && space.kind === "shared" && <span className="mk-card__meta">{t("space.shared.hint")}</span>}
+        </a>
+      </li>
+    );
+  };
 
 
   return (
@@ -70,23 +112,33 @@ const IndexPage: React.FC<PageProps> = () => {
         </div>
       )}
 
-      {spaces && spaces.length > 0 && byOrganisation(spaces).map((org) => (
-        <section key={org.id} className="mk-org">
-          <h2 className="mk-org__name">{org.name}</h2>
-          <ul className="mk-cards">
-            {org.spaces.map((space) => (
-              <li key={space.id}>
-                <a className="mk-card" href={`/w/${space.id}/`}>
-                  {/* The id, deliberately not shown. ADR-0003: never render an id
-                      where a name belongs. */}
-                  <span className="mk-card__title">{space.kind === "private" ? "🔒 " : ""}{workspaceName(space, t)}</span>
-                  {space.kind === "shared" && <span className="mk-card__meta">{t("space.shared.hint")}</span>}
-                </a>
-              </li>
-            ))}
-          </ul>
+      {org && (
+        <section className="mk-org">
+          <div className="mk-org__head">
+            {orgs.length > 1 ? (
+              <label className="mk-org__pick">{t("home.org")}{" "}
+                <select className="mk-select" value={org.id} onChange={(e) => choose(e.target.value)}>
+                  {orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                </select>
+              </label>
+            ) : <h2 className="mk-org__name">{org.name}</h2>}
+          </div>
+          <div className="mk-split">
+            <div className="mk-split__half">
+              <h2 className="mk-split__title">{t("home.active")} <span className="mk-muted">({halves.active.length})</span></h2>
+              <p className="mk-muted mk-split__hint">{t("home.active.hint", { days: ACTIVE_DAYS })}</p>
+              {halves.active.length ? <ul className="mk-cards mk-cards--one">{halves.active.map(card)}</ul>
+                : <p className="mk-muted">{t("home.active.none")}</p>}
+            </div>
+            <div className="mk-split__half">
+              <h2 className="mk-split__title">{t("home.passive")} <span className="mk-muted">({halves.passive.length})</span></h2>
+              <p className="mk-muted mk-split__hint">{t("home.passive.hint")}</p>
+              {halves.passive.length ? <ul className="mk-cards mk-cards--one">{halves.passive.map(card)}</ul>
+                : <p className="mk-muted">{t("home.passive.none")}</p>}
+            </div>
+          </div>
         </section>
-      ))}
+      )}
     </Shell>
   );
 };

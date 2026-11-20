@@ -41,3 +41,8 @@ test("not Turtle is refused, not thrown", async () => {
   assert.equal(v.ok, false);
   assert.match(v.problems[0], /not valid Turtle/);
 });
+
+test("a save counts blocks and modules for the landing page", async () => {
+  const v = await validateAbox(`${P}<https://maker-5.cloud/id/block/b-1> a m5:Block ; schema:name "Bell board" ; m5:blockType m5:Electronic .`);
+  assert.deepEqual(v.counts, { blocks: 1, modules: 0 });
+});

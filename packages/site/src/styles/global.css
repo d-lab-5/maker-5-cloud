@@ -1223,3 +1223,12 @@ a {
 .mk-boxlist--inside > li { border-bottom: 0; padding: 0.15rem 0; }
 .mk-boxcard h1 { overflow-wrap: anywhere; }
 .mk-boxcard .mk-boxlist__row .mk-button { padding: 0.3rem 0.7rem; }
+
+/* -- the landing page: active and passive workspaces (ADR-0018) ----------- */
+.mk-org__head { display: flex; align-items: center; gap: var(--mk-space-3); margin: 0 0 var(--mk-space-3); }
+.mk-split { display: grid; gap: var(--mk-space-6); grid-template-columns: 1fr 1fr; align-items: start; }
+.mk-split__half { min-width: 0; }
+.mk-split__title { font-size: 1.05rem; margin: 0; }
+.mk-split__hint { margin: 0.15rem 0 var(--mk-space-3); font-size: 0.85rem; }
+.mk-cards--one { grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); }
+@media (max-width: 760px) { .mk-split { grid-template-columns: 1fr; } }

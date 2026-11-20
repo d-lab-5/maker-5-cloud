@@ -24,6 +24,15 @@ export interface Verdict {
   ok: boolean;
   problems: string[];
   triples: number;
+  /** What the landing page counts: blocks and software modules. */
+  counts?: { blocks: number; modules: number };
+}
+
+const RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
+const M5 = "https://maker-5.cloud/ontology#";
+export function countKinds(quads: N3.Quad[]): { blocks: number; modules: number } {
+  const of = (c: string) => quads.filter((q) => q.predicate.value === RDF_TYPE && q.object.value === M5 + c).length;
+  return { blocks: of("Block"), modules: of("SoftwareModule") };
 }
 
 export async function validateAbox(ttl: string): Promise<Verdict> {
@@ -53,5 +62,5 @@ export async function validateAbox(ttl: string): Promise<Verdict> {
   // this is exactly what packages/ontology's tests do.
   const report = await new SHACLValidator(shapes, { factory: rdf as any }).validate(data);
   const problems = [...new Set(report.results.map((r: any) => r.message?.[0]?.value ?? "invalid"))] as string[];
-  return { ok: report.conforms, problems, triples: quads.length };
+  return { ok: report.conforms, problems, triples: quads.length, counts: countKinds(quads) };
 }

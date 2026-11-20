@@ -77,6 +77,13 @@ const schema = a.schema({
       version: a.integer().required(),
       triples: a.integer(),
       updatedBy: a.string(),
+      /** Counted at each save, for the landing page. */
+      blocks: a.integer(),
+      modules: a.integer(),
+      /** ADR-0018: the last time an edge read or wrote it, and which edge. */
+      edgeSeenAt: a.datetime(),
+      edgeSeenBy: a.string(),
+      edgeSeenName: a.string(),
     })
     .identifier(["name"])
     .authorization((allow) => [

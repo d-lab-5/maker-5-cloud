@@ -2,6 +2,7 @@ import { generateClient } from "aws-amplify/api";
 import type { DeviceCodeInfo, EdgeSummary, Space, Tenant } from "@dlab5/maker-5-core";
 import { tenantCode } from "@dlab5/maker-5-core";
 import { busy } from "../components/Feedback";
+import type { Activity } from "./activity";
 
 /**
  * The AppSync client, and everything layered on it.
@@ -88,6 +89,13 @@ const REVOKE_EDGE = /* GraphQL */ `
 `;
 const EDGE_RELEASE = /* GraphQL */ `query EdgeRelease { edgeRelease }`;
 
+const LIST_GRAPH_ACTIVITY = /* GraphQL */ `
+  query ListGraphActivity($tenantId: ID!, $nextToken: String) {
+    listGraphs(filter: { tenantId: { eq: $tenantId } }, limit: 500, nextToken: $nextToken) {
+      items { name updatedAt blocks modules edgeSeenAt edgeSeenName } nextToken
+    }
+  }
+`;
 const GET_GRAPH = /* GraphQL */ `
   query GetGraph($name: ID!) { getGraph(name: $name) { name ttl version updatedAt updatedBy } }
 `;
@@ -282,6 +290,12 @@ export interface StoredGraph {
 }
 
 /** A space's A-Box (name = space id), or an empty one at version 0 when it does not exist yet. */
+/** Per space of a tenant: when an edge last used it, its last change and what it holds (ADR-0018). */
+export async function graphActivity(tenantId: string): Promise<Record<string, Activity>> {
+  const rows = await all_<Activity>(LIST_GRAPH_ACTIVITY, "listGraphs", { tenantId });
+  return Object.fromEntries(rows.map((r) => [r.name, r]));
+}
+
 export async function loadGraph(name: string): Promise<StoredGraph> {
   const g = (await call<{ getGraph: StoredGraph | null }>(GET_GRAPH, { name })).getGraph;
   return g ?? { ttl: "", version: 0 };
