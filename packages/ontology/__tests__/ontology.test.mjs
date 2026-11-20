@@ -96,3 +96,12 @@ test("ADR-0021: a block's picture is a Wokwi element, drawn, or the agent's SVG"
     assert.equal((await validate(`${B} ${bad} .`)).conforms, false, bad.slice(0, 40));
   }
 });
+
+test("A pin is drawn left, right or at the bottom", async () => {
+  const B = `${P}<https://maker-5.cloud/id/block/b-1> a m5:Block ; schema:name "Relay" .
+    <https://maker-5.cloud/id/pin/b-1.1> a m5:Pin ; schema:name "IN" ; m5:pinOf <https://maker-5.cloud/id/block/b-1> ;`;
+  for (const ok of ["left", "right", "bottom"]) assert.ok((await validate(`${B} m5:pinSide "${ok}" .`)).conforms, ok);
+  assert.equal((await validate(`${B} m5:pinSide "top" .`)).conforms, false);
+  assert.ok((await validate(`${B} m5:pinSide "left" ; m5:pinPlace 3 .`)).conforms);
+  assert.equal((await validate(`${B} m5:pinPlace 0 .`)).conforms, false);
+});
