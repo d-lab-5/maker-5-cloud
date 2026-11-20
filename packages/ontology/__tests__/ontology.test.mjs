@@ -85,3 +85,14 @@ test("ADR-0020: a block records the commit last deployed to it, and when", async
   assert.equal((await validate(`${B} m5:deployedCommit "abc" .`)).conforms, false);
   assert.equal((await validate(`${B} m5:deployedAt "yesterday" .`)).conforms, false);
 });
+
+test("ADR-0021: a block's picture is a Wokwi element, drawn, or the agent's SVG", async () => {
+  const B = `${P}<https://maker-5.cloud/id/block/b-1> a m5:Block ; schema:name "Relay" ;`;
+  for (const ok of [`m5:partImage "wokwi:arduino-uno"`, `m5:partImage "drawn"`, `m5:partDrawing "<svg viewBox='0 0 10 10'></svg>"`]) {
+    assert.ok((await validate(`${B} ${ok} .`)).conforms, ok);
+  }
+  for (const bad of [`m5:partImage "https://example.org/x.svg"`, `m5:partImage "wokwi:Bad Name"`, `m5:partDrawing "<script/>"`,
+    `m5:partDrawing "<svg>${"x".repeat(40001)}</svg>"`]) {
+    assert.equal((await validate(`${B} ${bad} .`)).conforms, false, bad.slice(0, 40));
+  }
+});
