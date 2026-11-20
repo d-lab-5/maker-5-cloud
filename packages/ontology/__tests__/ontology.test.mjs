@@ -77,3 +77,11 @@ test("a block names at most one Fritzing part, by its file in the library", asyn
     assert.equal((await validate(`${B} m5:fritzingPart ${bad} .`)).conforms, false, bad);
   }
 });
+
+test("ADR-0020: a block records the commit last deployed to it, and when", async () => {
+  const B = `${P}@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n<https://maker-5.cloud/id/block/b-1> a m5:Block ; schema:name "Pi" ;`;
+  const at = `"2026-11-20T12:00:00Z"^^xsd:dateTime`;
+  assert.ok((await validate(`${B} m5:deployedCommit "${"a".repeat(40)}" ; m5:deployedAt ${at} .`)).conforms);
+  assert.equal((await validate(`${B} m5:deployedCommit "abc" .`)).conforms, false);
+  assert.equal((await validate(`${B} m5:deployedAt "yesterday" .`)).conforms, false);
+});
