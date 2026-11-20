@@ -7,6 +7,7 @@
 // write: free >= qty). A serialised article's counts follow its units.
 
 import { randomInt } from "node:crypto";
+import { CATEGORY_LIST } from "./categories.generated";
 
 export class Refused extends Error {}
 
@@ -17,7 +18,36 @@ export const ARTICLE = /^a-[23456789abcdefghjkmnpqrstuvwxyz]{10}$/;
 export const UNIT = /^u-[23456789abcdefghjkmnpqrstuvwxyz]{10}$/;
 export const BOX = /^x-[23456789abcdefghjkmnpqrstuvwxyz]{10}$/;
 
-export const CATEGORIES = ["compute", "storage", "electronic", "mechanical", "cable", "consumable", "tool", "other"] as const;
+/** ADR-0019: two levels, "top" or "top/sub", from the ontology's m5:ArticleCategories. */
+export const CATEGORIES: readonly string[] = CATEGORY_LIST.map((c) => c.code);
+/** The one-level values articles were saved with before 0.5.0. */
+export const LEGACY: Record<string, string> = {
+  compute: "controllers/sbc", storage: "controllers/storage", electronic: "components", mechanical: "mechanical",
+  cable: "cables", consumable: "consumables", tool: "tools", other: "other",
+};
+/** A category as it is now: an old value mapped, an unknown one "other". */
+export const category = (v: unknown): string => {
+  const s = String(v ?? "");
+  return CATEGORIES.includes(s) ? s : Object.hasOwn(LEGACY, s) ? LEGACY[s] : "other";
+};
+/** Whether an article's category is the filter, or under it ("controllers" holds "controllers/sbc"). */
+export const inCategory = (value: string, filter: string): boolean => {
+  if (!filter) return true;
+  const c = category(value), f = CATEGORIES.includes(filter) || !Object.hasOwn(LEGACY, filter) ? filter : LEGACY[filter];
+  return c === f || c.startsWith(f + "/");
+};
+
+/** The catalogue's tiles: per category (top and sub), how many articles and how many free. */
+export function catalogue(articles: Array<Pick<Article, "category" | "free"> & { proposed?: unknown }>) {
+  const n: Record<string, { articles: number; free: number }> = {};
+  for (const c of CATEGORY_LIST) n[c.code] = { articles: 0, free: 0 };
+  for (const a of articles) {
+    if (a.proposed) continue;
+    const c = category(a.category);
+    for (const k of new Set([c, c.split("/")[0]])) { n[k].articles += 1; n[k].free += Math.max(0, a.free || 0); }
+  }
+  return CATEGORY_LIST.map((c) => ({ code: c.code, top: c.top, label: c.label, ...n[c.code] }));
+}
 export const TRACKING = ["bulk", "serial"] as const;
 export const UNITS_OF = ["pcs", "m", "g", "ml", "set"] as const;
 export const UNIT_STATES = ["in-stock", "reserved", "in-use", "retired"] as const;
@@ -57,7 +87,7 @@ export function articleFields(a: Record<string, unknown>, existing?: Article) {
   const name = text(a.name ?? existing?.name, 120);
   if (!name) throw new Refused("An article needs a name.");
   const category = String(a.category ?? existing?.category ?? "other");
-  if (!(CATEGORIES as readonly string[]).includes(category)) throw new Refused(`No category ${category}.`);
+  if (!CATEGORIES.includes(category) && !Object.hasOwn(LEGACY, category)) throw new Refused(`No category ${category}.`);
   const tracking = String(a.tracking ?? existing?.tracking ?? "bulk") as Tracking;
   if (!(TRACKING as readonly string[]).includes(tracking)) throw new Refused("An article is tracked in bulk or unit by unit.");
   if (existing && existing.tracking !== tracking && existing.onHand > 0) {
@@ -70,7 +100,7 @@ export function articleFields(a: Record<string, unknown>, existing?: Article) {
   const datasheet = text(a.datasheet ?? existing?.datasheet, 500);
   if (datasheet && !/^https:\/\//.test(datasheet)) throw new Refused("A datasheet is an https:// link.");
   return {
-    name, category, tracking, unit, minStock, datasheet,
+    name, category: CATEGORIES.includes(category) ? category : LEGACY[category], tracking, unit, minStock, datasheet,
     manufacturer: text(a.manufacturer ?? existing?.manufacturer, 80),
     mpn: text(a.mpn ?? existing?.mpn, 80),
     location: text(a.location ?? existing?.location, 80),

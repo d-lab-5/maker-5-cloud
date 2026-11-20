@@ -32,6 +32,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
     switch (route) {
       case "list": return json(200, { articles: await st.listArticles(actor, tenant, b.q ?? "", b.category ?? "") });
       case "get": return json(200, await st.article(actor, tenant, String(b.id ?? "")));
+      case "categories": return json(200, { categories: await st.categories(actor, tenant) });
+      case "idle": return json(200, { parts: await st.idle(actor, tenant, b.category ?? "") });
       case "unit": return json(200, await st.unit(actor, tenant, String(b.id ?? "")));
       case "resolve": return json(200, await st.resolve(actor, String(b.code ?? "")));
       case "product": return json(200, await st.spaceMaterials(actor, String(b.spaceId ?? "")));

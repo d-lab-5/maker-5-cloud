@@ -27,7 +27,7 @@ test("quantities are whole and positive", () => {
 });
 
 test("an article's fields: a name, a known category, and tracking fixed while in stock", () => {
-  const f = articleFields({ name: "  Raspberry  Pi 1 B ", category: "compute", tracking: "serial", unit: "m" });
+  const f = articleFields({ name: "  Raspberry  Pi 1 B ", category: "controllers/sbc", tracking: "serial", unit: "m" });
   assert.equal(f.name, "Raspberry Pi 1 B");
   assert.equal(f.unit, "pcs", "a serialised article is counted in pieces");
   assert.throws(() => articleFields({ name: "" }), /needs a name/);
@@ -83,11 +83,32 @@ test("links are https, of a known kind; file names lose their path", () => {
 
 test("an edge proposes articles: checked like an admin's, at most 50 at once, never with stock moved", () => {
   const got = proposalFields([{ name: "Optocoupler PC817", category: "electronic" }, { name: "Step-down 12 V to 5 V" }]);
-  assert.deepEqual(got.map((a) => [a.name, a.category, a.tracking]), [["Optocoupler PC817", "electronic", "bulk"], ["Step-down 12 V to 5 V", "other", "bulk"]]);
+  assert.deepEqual(got.map((a) => [a.name, a.category, a.tracking]), [["Optocoupler PC817", "components", "bulk"], ["Step-down 12 V to 5 V", "other", "bulk"]]);
   assert.throws(() => proposalFields([]), Refused);
   assert.throws(() => proposalFields([{ name: "" }]), Refused);
   assert.throws(() => proposalFields([{ name: "x", category: "food" }]), Refused);
   assert.throws(() => proposalFields(Array.from({ length: MAX_PROPOSE + 1 }, (_, i) => ({ name: `p${i}` }))), Refused);
   assert.throws(() => accepted({ name: "PC817", proposed: { by: "edge:e-1", at: "2026-01-01" } }), /proposed/);
   assert.doesNotThrow(() => accepted({ name: "PC817" }));
+});
+
+test("ADR-0019: two levels of category, the old values mapped", async () => {
+  const { CATEGORIES, category, inCategory, catalogue } = await import("./stock");
+  assert.ok(CATEGORIES.includes("controllers") && CATEGORIES.includes("controllers/sbc"));
+  assert.equal(category("compute"), "controllers/sbc");
+  assert.equal(category("storage"), "controllers/storage");
+  assert.equal(category("media/audio"), "media/audio");
+  assert.equal(category("constructor"), "other", "no prototype keys");
+  assert.equal(articleFields({ name: "Card", category: "storage" }).category, "controllers/storage");
+  assert.equal(inCategory("controllers/sbc", "controllers"), true);
+  assert.equal(inCategory("compute", "controllers"), true, "an old value is found under its new top");
+  assert.equal(inCategory("controllers/sbc", "controllers/mcu"), false);
+  assert.equal(inCategory("controllersx", "controllers"), false);
+  const tiles = catalogue([{ category: "controllers/sbc", free: 2 }, { category: "compute", free: 1 },
+    { category: "media/audio", free: 0 }, { category: "components", free: 5, proposed: true }]);
+  const of = (c: string) => tiles.find((x) => x.code === c)!;
+  assert.deepEqual([of("controllers").articles, of("controllers").free, of("controllers/sbc").articles], [2, 3, 2]);
+  assert.equal(of("media").articles, 1);
+  assert.equal(of("components").articles, 0, "a proposed article is not counted");
+  assert.equal(of("controllers").label.de, "Steuerungen & Rechner");
 });

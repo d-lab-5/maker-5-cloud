@@ -18,11 +18,13 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import {
   BatchGetCommand, DeleteCommand, GetCommand, PutCommand, QueryCommand, TransactWriteCommand, UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
-import { doc, getSpace, type Space } from "../shared/spaces";
+import { doc, getSpace, spacesOfTenant, type Space } from "../shared/spaces";
+import { activeAt, edgeSeen } from "../graph-shared/activity";
 import { BadCode, codeKey, labelUrl, mintOwn, normalise, type Code } from "./codes";
 import {
   ARTICLE, BOX, MAX_FILE_BYTES, MAX_FILES, MAX_LINKS, LINK_KINDS, UNIT, Refused, UNIT_STEP, articleFields, boxFields, boxFits, boxable,
   counts, fileName, linkFields, mintId, qty, wouldLoop, accepted, proposalFields, MAX_PROPOSED,
+  category as stockCategory, inCategory, catalogue,
   type Article, type Box, type BoxFile, type BoxLink, type Step, type Unit
 } from "./stock";
 
@@ -117,10 +119,38 @@ export async function listArticles(actor: Actor, tenantId: string, q = "", categ
   }, 5000);
   const words = q.toLowerCase().split(/\s+/).filter(Boolean);
   return all
-    .filter((a) => !category || a.category === category)
+    .map((a) => ({ ...a, category: stockCategory(a.category) }))
+    .filter((a) => inCategory(a.category, category))
     .filter((a) => words.every((w) => `${a.name} ${a.manufacturer ?? ""} ${a.mpn ?? ""} ${a.location ?? ""}`.toLowerCase().includes(w)))
     .map((a) => ({ ...a, low: a.minStock !== undefined && a.free < a.minStock }))
     .sort((x, y) => x.name.localeCompare(y.name));
+}
+
+/** Parts that passive workspaces hold (ADR-0018): reserved by a workspace
+ * no edge has used in 14 days, so a new design may ask for them back. */
+export async function idle(actor: Actor, tenantId: string, category = "") {
+  reads(actor, tenantId);
+  const now = Date.now();
+  const [spaces, seen] = await Promise.all([spacesOfTenant(tenantId), edgeSeen(tenantId)]);
+  const passive = spaces.filter((s) => !activeAt(seen[s.id], now));
+  const out: Array<{ workspace: { id: string; name: string; edgeSeenAt: string | null }; article: { id: string; name: string; category: string }; reserved: number }> = [];
+  for (const s of passive) {
+    const rows = await query<{ articleId: string; reserved: number }>({
+      TableName: T.allocations(), KeyConditionExpression: "spaceId = :s", ExpressionAttributeValues: { ":s": s.id },
+    });
+    for (const r of rows.filter((x) => x.reserved > 0)) {
+      const a = await getArticleRow(tenantId, r.articleId);
+      if (!a || !inCategory(a.category, category)) continue;
+      out.push({ workspace: { id: s.id, name: s.name, edgeSeenAt: seen[s.id] ?? null },
+        article: { id: a.id, name: a.name, category: stockCategory(a.category) }, reserved: r.reserved });
+    }
+  }
+  return out.slice(0, 200);
+}
+
+/** ADR-0019: the catalogue's tiles, counted over the organisation's accepted articles. */
+export async function categories(actor: Actor, tenantId: string) {
+  return catalogue(await listArticles(actor, tenantId));
 }
 
 export async function article(actor: Actor, tenantId: string, id: string) {

@@ -9,15 +9,19 @@ import type { Article, StockWorkspace } from "../lib/materials";
 import { useT } from "../lib/i18n";
 import { EditBox } from "../components/BoxCard";
 import { listSpaces, type Space } from "../lib/data";
+import { catalogue, categoryName, categoryOf, inCategory, subCategories, topCategories } from "@dlab5/maker-5-core";
 
 /**
  * A workspace's stock (ADR-0008 in maker-5-shared): the catalogue of every
  * article in scope, its internal "marketplace", with what is on hand,
- * reserved by products and free. Admins add articles, receive stock, count
+ * reserved by products and free. Tiles of categories lead into it, two
+ * levels deep (ADR-0019), and a search counts across all of them. Also
+ * Admins add articles, receive stock, count
  * it and print labels; everyone in the workspace reads it. Products take
  * parts in their own Materials view (/w/<id>/materials/).
  *
  *   /materials/?w=<tenant>&a=<article>
+ *   /materials/?w=<tenant>&c=controllers/sbc  one category of the catalogue
  *   /materials/?w=<tenant>&tab=boxes          the organisation's boxes (ADR-0011)
  */
 
@@ -30,12 +34,12 @@ const setParams = (p: Record<string, string | undefined>) => {
 };
 
 const MaterialsPage: React.FC<PageProps> = () => {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [workspaces, setWorkspaces] = React.useState<StockWorkspace[] | null>(null);
   const [w, setW] = React.useState("");
   const [list, setList] = React.useState<Article[] | null>(null);
   const [q, setQ] = React.useState("");
-  const [cat, setCat] = React.useState("");
+  const [cat, setCat] = React.useState(params().get("c") ?? "");
   const [onlyProposed, setOnlyProposed] = React.useState(false);
   const [open, setOpen] = React.useState(params().get("a") ?? "");
   const [adding, setAdding] = React.useState(false);
@@ -54,12 +58,16 @@ const MaterialsPage: React.FC<PageProps> = () => {
   }, []);
   const load = React.useCallback(() => {
     if (!w) return;
-    m.articles(w, q, cat).then(setList).catch((e) => setError(message(e)));
-  }, [w, q, cat]);
+    m.articles(w, q).then(setList).catch((e) => setError(message(e)));
+  }, [w, q]);
   React.useEffect(() => { const id = window.setTimeout(load, q ? 250 : 0); return () => window.clearTimeout(id); }, [load, q]);
-  React.useEffect(() => { if (w) setParams({ w, a: open || undefined, tab: tab === "boxes" ? "boxes" : undefined }); }, [w, open, tab]);
+  React.useEffect(() => { if (w) setParams({ w, a: open || undefined, c: cat || undefined, tab: tab === "boxes" ? "boxes" : undefined }); }, [w, open, cat, tab]);
 
   const ws = workspaces?.find((x) => x.id === w);
+  const counts = React.useMemo(() => catalogue(list ?? []), [list]);
+  const shown = list?.filter((a) => inCategory(a.category, cat) && (!onlyProposed || a.proposed));
+  const top = cat.split("/")[0];
+  const tiles = cat.includes("/") ? [] : cat ? subCategories(cat) : topCategories();
   const admin = Boolean(ws?.admin);
   const mintBlank = async () => {
     setError(null);
@@ -97,12 +105,26 @@ const MaterialsPage: React.FC<PageProps> = () => {
             <div className="mk-toolbar">
               <input className="mk-input" type="search" placeholder={t("mt.search")} value={q}
                 onChange={(e) => setQ(e.target.value)} aria-label={t("mt.search")} />
-              <select className="mk-select" value={cat} onChange={(e) => setCat(e.target.value)} aria-label={t("mt.category")}>
-                <option value="">{t("mt.allcategories")}</option>
-                {m.CATEGORIES.map((c) => <option key={c} value={c}>{t(`cat.${c}`)}</option>)}
-              </select>
               {admin && <button type="button" className="mk-button" onClick={() => setAdding(true)}>{t("mt.add")}</button>}
             </div>
+            <nav className="mk-crumbs" aria-label={t("mt.category")}>
+              <button type="button" className="mk-linkbutton" onClick={() => setCat("")} aria-current={!cat}>{t("mt.allcategories")}</button>
+              {top && <> › <button type="button" className="mk-linkbutton" onClick={() => setCat(top)} aria-current={cat === top}>{categoryName(top, lang)}</button></>}
+              {cat.includes("/") && <> › <strong>{categoryName(cat, lang)}</strong></>}
+            </nav>
+            {tiles.length > 0 && (
+              <ul className="mk-tiles">
+                {tiles.map((c) => (
+                  <li key={c.code}>
+                    <button type="button" className={`mk-tile${counts[c.code]?.articles ? "" : " mk-tile--empty"}`} onClick={() => setCat(c.code)}>
+                      <span className="mk-tile__name">{c.label[lang] ?? c.label.en}</span>
+                      <span className="mk-tile__n">{t("mt.tile", { n: counts[c.code]?.articles ?? 0, free: counts[c.code]?.free ?? 0 })}</span>
+                      {!cat && <span className="mk-tile__subs">{subCategories(c.code).filter((s) => counts[s.code]?.articles).map((s) => s.label[lang] ?? s.label.en).slice(0, 4).join(" · ")}</span>}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
             {(list?.some((a) => a.proposed) || onlyProposed) && (
               <p className="mk-panel__hint mk-proposed-note">
                 {t("mt.proposed.note", { n: list?.filter((a) => a.proposed).length ?? 0 })}{" "}
@@ -117,20 +139,20 @@ const MaterialsPage: React.FC<PageProps> = () => {
                 <th className="mk-num">{t("mt.onhand")}</th><th className="mk-num">{t("mt.reserved")}</th><th className="mk-num">{t("mt.free")}</th>
               </tr></thead>
               <tbody>
-                {list?.filter((a) => !onlyProposed || a.proposed).map((a) => (
+                {shown?.map((a) => (
                   <tr key={a.id} className={`${a.id === open ? "mk-row--on" : ""}${a.low ? " mk-row--low" : ""}`}
                     onClick={() => setOpen(a.id === open ? "" : a.id)} tabIndex={0}
                     onKeyDown={(e) => { if (e.key === "Enter") setOpen(a.id === open ? "" : a.id); }}>
                     <td><strong>{a.name}</strong>{a.manufacturer || a.mpn ? <span className="mk-muted"> · {[a.manufacturer, a.mpn].filter(Boolean).join(" ")}</span> : null}
                       {a.tracking === "serial" && <span className="mk-pill">{t("mt.serial")}</span>}
                       {a.proposed && <span className="mk-pill mk-pill--warn">{t("mt.proposed")}</span>}</td>
-                    <td>{t(`cat.${a.category}`)}</td>
+                    <td>{categoryName(a.category, lang, !cat.includes("/"))}</td>
                     <td className="mk-num">{a.onHand} {a.unit !== "pcs" ? a.unit : ""}</td>
                     <td className="mk-num">{a.reserved}</td>
                     <td className="mk-num">{a.free}{a.low && <span className="mk-pill mk-pill--warn">{t("mt.low")}</span>}</td>
                   </tr>
                 ))}
-                {list?.length === 0 && <tr><td colSpan={5} className="mk-muted">{q || cat ? t("mt.nomatch") : t("mt.none")}</td></tr>}
+                {shown?.length === 0 && <tr><td colSpan={5} className="mk-muted">{q || cat ? t("mt.nomatch") : t("mt.none")}</td></tr>}
                 {!list && !error && <tr><td colSpan={5} className="mk-muted">…</td></tr>}
               </tbody>
             </table>
@@ -234,8 +256,10 @@ function BoxesPanel({ tenantId, admin, onLabels }: { tenantId: string; admin: bo
 }
 
 function ArticleForm({ tenantId, article, onDone }: { tenantId: string; article?: Article; onDone: (a: Article | null) => void }) {
-  const { t } = useT();
-  const [f, setF] = React.useState<Partial<Article>>(article ?? { category: "electronic", tracking: "bulk", unit: "pcs" });
+  const { t, lang } = useT();
+  const [f, setF] = React.useState<Partial<Article>>(article ? { ...article, category: categoryOf(article.category) }
+    : { category: "components", tracking: "bulk", unit: "pcs" });
+  const fTop = (f.category ?? "other").split("/")[0];
   const [error, setError] = React.useState<string | null>(null);
   const set = (k: keyof Article) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setF({ ...f, [k]: e.target.value });
@@ -247,9 +271,15 @@ function ArticleForm({ tenantId, article, onDone }: { tenantId: string; article?
   return (
     <form className="mk-form mk-articleform" onSubmit={(e) => { e.preventDefault(); void save(); }}>
       <input className="mk-input" required placeholder={t("mt.f.name")} value={f.name ?? ""} onChange={set("name")} aria-label={t("mt.f.name")} />
-      <select className="mk-select" value={f.category} onChange={set("category")} aria-label={t("mt.category")}>
-        {m.CATEGORIES.map((c) => <option key={c} value={c}>{t(`cat.${c}`)}</option>)}
+      <select className="mk-select" value={fTop} onChange={(e) => setF({ ...f, category: e.target.value })} aria-label={t("mt.category")}>
+        {topCategories().map((c) => <option key={c.code} value={c.code}>{c.label[lang] ?? c.label.en}</option>)}
       </select>
+      {subCategories(fTop).length > 0 && (
+        <select className="mk-select" value={f.category} onChange={set("category")} aria-label={t("mt.subcategory")}>
+          <option value={fTop}>{t("mt.subcategory.any")}</option>
+          {subCategories(fTop).map((c) => <option key={c.code} value={c.code}>{c.label[lang] ?? c.label.en}</option>)}
+        </select>
+      )}
       <select className="mk-select" value={f.tracking} onChange={set("tracking")} aria-label={t("mt.f.tracking")}
         disabled={Boolean(article && article.onHand > 0)}>
         <option value="bulk">{t("mt.f.bulk")}</option>
@@ -278,7 +308,7 @@ function ArticleForm({ tenantId, article, onDone }: { tenantId: string; article?
 function ArticlePanel({ tenantId, id, admin, onChanged, onLabels }: {
   tenantId: string; id: string; admin: boolean; onChanged: () => void; onLabels: (items: LabelItem[], layout: Layout) => void;
 }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [d, setD] = React.useState<Awaited<ReturnType<typeof m.article>> | null>(null);
   const [editing, setEditing] = React.useState(false);
   const [qty, setQty] = React.useState(1);
@@ -333,7 +363,7 @@ function ArticlePanel({ tenantId, id, admin, onChanged, onLabels }: {
         {a.minStock !== undefined && <div className="mk-stat"><dt>{a.minStock}</dt><dd>{t("mt.f.min")}</dd></div>}
       </dl>
       <p className="mk-panel__hint">
-        {[t(`cat.${a.category}`), a.manufacturer, a.mpn, a.location && `${t("mt.f.location")}: ${a.location}`].filter(Boolean).join(" · ")}
+        {[categoryName(a.category, lang, true), a.manufacturer, a.mpn, a.location && `${t("mt.f.location")}: ${a.location}`].filter(Boolean).join(" · ")}
         {a.datasheet && <> · <a href={a.datasheet} target="_blank" rel="noreferrer">{t("mt.f.datasheet")}</a></>}
       </p>
       {a.note && <p className="mk-panel__hint">{a.note}</p>}

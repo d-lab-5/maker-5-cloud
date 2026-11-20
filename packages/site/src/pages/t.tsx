@@ -9,6 +9,7 @@ import { UnitPicker } from "../components/UnitPicker";
 import * as m from "../lib/materials";
 import { listSpaces, type Space } from "../lib/data";
 import { useT } from "../lib/i18n";
+import { categoryName } from "@dlab5/maker-5-core";
 
 /**
  * The card a code opens (ADR-0009 in maker-5-shared): a label's QR, an NFC
@@ -64,7 +65,7 @@ const CardPage: React.FC<PageProps> = ({ location }) => {
 };
 
 function ArticleCard({ tenantId, id, serial }: { tenantId: string; id: string; serial?: string }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [d, setD] = React.useState<Awaited<ReturnType<typeof m.article>> | null>(null);
   const [admin, setAdmin] = React.useState(false);
   React.useEffect(() => { void m.article(tenantId, id).then(setD); }, [tenantId, id]);
@@ -73,7 +74,7 @@ function ArticleCard({ tenantId, id, serial }: { tenantId: string; id: string; s
   const a = d.article;
   return (
     <div className="mk-card">
-      <p className="mk-muted">{t(`cat.${a.category}`)}{a.manufacturer ? ` · ${a.manufacturer}` : ""}{a.mpn ? ` ${a.mpn}` : ""}</p>
+      <p className="mk-muted">{categoryName(a.category, lang, true)}{a.manufacturer ? ` · ${a.manufacturer}` : ""}{a.mpn ? ` ${a.mpn}` : ""}</p>
       <h1>{a.name}</h1>
       <dl className="mk-stats">
         <div className="mk-stat"><dt>{a.free}</dt><dd>{t("mt.free")}</dd></div>
@@ -95,7 +96,7 @@ function ArticleCard({ tenantId, id, serial }: { tenantId: string; id: string; s
 }
 
 function UnitCard({ tenantId, id }: { tenantId: string; id: string }) {
-  const { t, date } = useT();
+  const { t, date, lang } = useT();
   const [d, setD] = React.useState<Awaited<ReturnType<typeof m.unit>> | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [ok, setOk] = React.useState<string | null>(null);
@@ -120,7 +121,7 @@ function UnitCard({ tenantId, id }: { tenantId: string; id: string }) {
 
   return (
     <div className="mk-card">
-      <p className="mk-muted">{d.article ? `${t(`cat.${d.article.category}`)} · ` : ""}{own ? <code className="mk-id">{own}</code> : null}</p>
+      <p className="mk-muted">{d.article ? `${categoryName(d.article.category, lang, true)} · ` : ""}{own ? <code className="mk-id">{own}</code> : null}</p>
       <h1>{u.name || d.article?.name || u.articleId}</h1>
       {u.name && d.article && <p className="mk-muted">{d.article.name}</p>}
       {u.serial && <p>{t("un.serial")}: <strong>{u.serial}</strong></p>}

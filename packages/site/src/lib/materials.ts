@@ -65,7 +65,7 @@ async function change<T>(op: string, args: Record<string, unknown>): Promise<T> 
   return parse<T>(r.changeMaterials);
 }
 
-export const CATEGORIES = ["compute", "storage", "electronic", "mechanical", "cable", "consumable", "tool", "other"] as const;
+export { CATEGORY_CODES as CATEGORIES } from "@dlab5/maker-5-core";
 export const UNITS_OF = ["pcs", "m", "g", "ml", "set"] as const;
 
 export const stockWorkspaces = () => read<StockWorkspace[]>("workspaces");

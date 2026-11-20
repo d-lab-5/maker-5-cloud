@@ -27,3 +27,16 @@ export {
 export type { DeviceCodeInfo, EdgeSummary, Space, Tenant } from "./types.js";
 
 export { assertSpace, isSpace, spaceProblems } from "./validate.js";
+
+export {
+  CATEGORY_CODES,
+  CATEGORY_LIST,
+  LEGACY_CATEGORIES,
+  catalogue,
+  categoryName,
+  categoryOf,
+  inCategory,
+  subCategories,
+  topCategories,
+} from "./categories.js";
+export type { Category } from "./categories.js";

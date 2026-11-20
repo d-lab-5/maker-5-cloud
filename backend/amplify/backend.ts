@@ -324,6 +324,9 @@ for (const f of [backend.materials, backend.edgeMaterials]) {
   for (const [k, t] of Object.entries(stockTables)) f.addEnvironment(`${k}_TABLE_NAME`, t.tableName);
   spaceRead(f.resources.lambda, f);
 }
+// ADR-0018: which workspaces are passive, for the parts they hold (materials/idle)
+backend.edgeMaterials.addEnvironment("GRAPH_TABLE_NAME", graphTable.tableName);
+allow(backend.edgeMaterials.resources.lambda, ["dynamodb:Scan"], [graphTable.tableArn]);
 allow(backend.materials.resources.lambda,
   ["dynamodb:GetItem", "dynamodb:BatchGetItem", "dynamodb:Query", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:ConditionCheckItem"],
   Object.values(stockTables).flatMap(withIndexes));
@@ -361,7 +364,7 @@ const routes: Array<[string, lambda.IFunction]> = [
   ["/edge/v1/graphs/get", backend.edgeGraphs.resources.lambda],
   ["/edge/v1/graphs/put", backend.edgeGraphs.resources.lambda],
   ["/edge/v1/models", backend.edgeModels.resources.lambda],
-  ...["list", "get", "unit", "resolve", "product", "reserve", "release", "return", "boxes", "box", "propose"].map(
+  ...["list", "get", "unit", "resolve", "product", "reserve", "release", "return", "boxes", "box", "propose", "categories", "idle"].map(
     (r) => [`/edge/v1/materials/${r}`, backend.edgeMaterials.resources.lambda] as [string, lambda.IFunction]),
 ];
 for (const [path, fn] of routes) {
