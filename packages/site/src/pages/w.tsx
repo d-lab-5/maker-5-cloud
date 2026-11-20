@@ -1,7 +1,8 @@
 import * as React from "react";
 import type { HeadFC, PageProps } from "gatsby";
 import { Shell } from "../components/Shell";
-import { getSpace } from "../lib/data";
+import { getSpace, repoOf } from "../lib/data";
+import { ago, repoName, type Activity } from "../lib/activity";
 import type { Space } from "../lib/data";
 import { SpaceMaterials } from "../components/SpaceMaterials";
 import { useT } from "../lib/i18n";
@@ -134,6 +135,9 @@ function Overview({ space }: { space: Space }) {
   const { t } = useT();
   const [boxes, setBoxes] = React.useState<m.BoxDetail[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [repo, setRepo] = React.useState<Activity | null>(null);
+  React.useEffect(() => { repoOf(space.id).then(setRepo).catch(() => setRepo(null)); }, [space.id]);
+  const when = (iso?: string | null) => { const a = ago(iso); return a ? t(a.key, { n: a.n }) : ""; };
   React.useEffect(() => {
     m.boxes(space.tenantId, "", space.id)
       .then((list) => Promise.all(list.slice(0, 40).map((b) => m.box(space.tenantId, b.id))))
@@ -145,6 +149,16 @@ function Overview({ space }: { space: Space }) {
   const open = async (boxId: string, fileId: string) => window.location.assign((await m.fileUrl(space.tenantId, boxId, fileId)).url);
   return (
     <>
+      <div className="mk-panel">
+        <h2 className="mk-panel__title">{t("ws.repo")}</h2>
+        {repo?.repoUrl ? (
+          <p><a href={repo.repoUrl} target="_blank" rel="noreferrer noopener"><strong>{repoName(repo.repoUrl)}</strong></a>
+            <span className="mk-muted"> · {repo.repoBranch}{repo.repoCommit ? ` @ ${repo.repoCommit.slice(0, 7)}` : ""}
+              {repo.repoPushedAt ? ` · ${t("ws.repo.pushed", { when: when(repo.repoPushedAt) })}` : ""}</span></p>
+        ) : <p className="mk-panel__hint">{t("ws.repo.none")}</p>}
+        <p className="mk-panel__hint">{t("ws.repo.hint")}</p>
+        {repo?.edgeSeenAt && <p className="mk-muted">{t("home.edgeUsed", { edge: repo.edgeSeenName || t("home.anEdge"), when: when(repo.edgeSeenAt) })}</p>}
+      </div>
       <div className="mk-panel">
         <h2 className="mk-panel__title">{t("ws.boxes")}</h2>
         {error && <p className="mk-error" role="alert">{error}</p>}

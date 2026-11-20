@@ -463,6 +463,10 @@
   "ws.boxes": "Boîtes",
   "ws.boxes.count": "{n} dedans",
   "ws.boxes.none": "Aucune boîte n'est encore attribuée à cet espace de travail.",
+  "ws.repo": "Conception et code",
+  "ws.repo.hint": "Ouvert : le logiciel et le modèle matériel vont sur GitHub. Stock, lieux, prix et personnes restent ici.",
+  "ws.repo.none": "Pas encore sur GitHub. Reliez-le sur l'edge : Relier à GitHub.",
+  "ws.repo.pushed": "poussé {when}",
   "ws.view.materials": "Matériel",
   "ws.view.overview": "Vue d'ensemble"
 }

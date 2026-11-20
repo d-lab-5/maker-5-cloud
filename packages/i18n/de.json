@@ -463,6 +463,10 @@
   "ws.boxes": "Boxen",
   "ws.boxes.count": "{n} darin",
   "ws.boxes.none": "Noch keine Box ist diesem Workspace zugeordnet.",
+  "ws.repo": "Entwurf und Code",
+  "ws.repo.hint": "Offen: Software und Hardware-Modell gehen zu GitHub. Bestand, Orte, Preise und Personen bleiben hier.",
+  "ws.repo.none": "Noch nicht auf GitHub. Auf der Edge verknüpfen: Mit GitHub verknüpfen.",
+  "ws.repo.pushed": "gepusht {when}",
   "ws.view.materials": "Material",
   "ws.view.overview": "Übersicht"
 }

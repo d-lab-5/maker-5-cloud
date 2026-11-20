@@ -18,3 +18,13 @@ test("active means an edge used it in the last 14 days", async () => {
   assert.equal(activeAt("2026-11-06T11:00:00Z", now), false);
   assert.equal(activeAt(undefined, now), false);
 });
+
+test("ADR-0017: a repository link is a GitHub address, a branch and a full commit", async () => {
+  const { repoProblem } = await import("./store");
+  assert.equal(repoProblem({ url: "https://github.com/example-org/door-bell", branch: "main", commit: "a".repeat(40) }), null);
+  assert.equal(repoProblem({ url: "https://github.com/example-org/door-bell", branch: "main" }), null);
+  assert.match(repoProblem({ url: "https://example.org/x/y", branch: "main" })!, /GitHub/);
+  assert.match(repoProblem({ url: "https://github.com/example-org/door-bell/../x", branch: "main" })!, /GitHub/);
+  assert.match(repoProblem({ url: "https://github.com/example-org/door-bell", branch: "a..b" })!, /branch/);
+  assert.match(repoProblem({ url: "https://github.com/example-org/door-bell", branch: "main", commit: "abc" })!, /commit/);
+});

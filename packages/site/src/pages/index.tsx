@@ -7,7 +7,7 @@ import { graphActivity, listSpaces } from "../lib/data";
 import type { Space } from "../lib/data";
 import { useT } from "../lib/i18n";
 import { byOrganisation, workspaceName } from "../lib/names";
-import { ACTIVE_DAYS, ago, split, type Activity } from "../lib/activity";
+import { ACTIVE_DAYS, ago, repoName, split, type Activity } from "../lib/activity";
 
 const ORG_KEY = "mk-org";
 
@@ -67,6 +67,7 @@ const IndexPage: React.FC<PageProps> = () => {
           <span className="mk-card__title">{space.kind === "private" ? "🔒 " : ""}{workspaceName(space, t)}</span>
           {a?.edgeSeenAt && <span className="mk-card__meta">{t("home.edgeUsed", { edge: a.edgeSeenName || t("home.anEdge"), when: when(a.edgeSeenAt) })}</span>}
           {a?.updatedAt && <span className="mk-card__meta">{t("home.changed", { when: when(a.updatedAt) })}{counts ? ` · ${counts}` : ""}</span>}
+          {a?.repoUrl && <span className="mk-card__meta mk-card__repo">GitHub: {repoName(a.repoUrl)}</span>}
           {!a && space.kind === "shared" && <span className="mk-card__meta">{t("space.shared.hint")}</span>}
         </a>
       </li>

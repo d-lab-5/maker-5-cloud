@@ -23,6 +23,24 @@ export interface StoredGraph {
   edgeSeenAt?: string;
   edgeSeenBy?: string;
   edgeSeenName?: string;
+  /** ADR-0017: the workspace's public repository, as its edge last pushed it. */
+  repoUrl?: string;
+  repoBranch?: string;
+  repoCommit?: string;
+  repoPushedAt?: string;
+  repoBy?: string;
+}
+
+export interface RepoLink { url: string; branch: string; commit?: string }
+
+/** A GitHub repository's address, a branch and a commit, or a reason why not (pure; tested). */
+export function repoProblem(r: Partial<RepoLink>): string | null {
+  if (!/^https:\/\/github\.com\/[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})\/[A-Za-z0-9._-]{1,100}$/.test(String(r.url ?? "")) || String(r.url).includes("..")) {
+    return "url is a GitHub repository: https://github.com/<owner>/<name>";
+  }
+  if (!/^[A-Za-z0-9._/-]{1,100}$/.test(String(r.branch ?? "")) || String(r.branch).includes("..")) return "branch is a branch name";
+  if (r.commit !== undefined && r.commit !== "" && !/^[0-9a-f]{40}$/.test(String(r.commit))) return "commit is a full commit id";
+  return null;
 }
 
 /** An edge that touches a graph: its id and, if it said, its host name. */
@@ -120,6 +138,27 @@ export async function touchGraph(name: string, edge: EdgeTouch, current?: Stored
     return true;
   } catch (err) {
     if ((err as { name?: string }).name === "ConditionalCheckFailedException") return false;
+    throw err;
+  }
+}
+
+/** ADR-0017: the edge says where the workspace's design and code are public.
+ * Only on a graph that exists: a workspace is synced before it is linked. */
+export async function setRepo(name: string, r: RepoLink, edge: EdgeTouch): Promise<"ok" | "missing"> {
+  const now = new Date().toISOString();
+  try {
+    await ddb.send(new UpdateItemCommand({
+      TableName: TABLE(), Key: marshall({ name }),
+      UpdateExpression: "SET repoUrl = :u, repoBranch = :b, repoCommit = :c, repoPushedAt = :now, repoBy = :by, " +
+        "edgeSeenAt = :now, edgeSeenBy = :by, edgeSeenName = :en",
+      ConditionExpression: "attribute_exists(#n)",
+      ExpressionAttributeNames: { "#n": "name" },
+      ExpressionAttributeValues: marshall({ ":u": r.url, ":b": r.branch, ":c": r.commit || "", ":now": now,
+        ":by": `edge:${edge.id}`, ":en": edge.name || "" }),
+    }));
+    return "ok";
+  } catch (err) {
+    if ((err as { name?: string }).name === "ConditionalCheckFailedException") return "missing";
     throw err;
   }
 }

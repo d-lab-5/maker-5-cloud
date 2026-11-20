@@ -92,12 +92,15 @@ const EDGE_RELEASE = /* GraphQL */ `query EdgeRelease { edgeRelease }`;
 const LIST_GRAPH_ACTIVITY = /* GraphQL */ `
   query ListGraphActivity($tenantId: ID!, $nextToken: String) {
     listGraphs(filter: { tenantId: { eq: $tenantId } }, limit: 500, nextToken: $nextToken) {
-      items { name updatedAt blocks modules edgeSeenAt edgeSeenName } nextToken
+      items { name updatedAt blocks modules edgeSeenAt edgeSeenName repoUrl repoBranch repoCommit repoPushedAt } nextToken
     }
   }
 `;
 const GET_GRAPH = /* GraphQL */ `
   query GetGraph($name: ID!) { getGraph(name: $name) { name ttl version updatedAt updatedBy } }
+`;
+const GET_REPO = /* GraphQL */ `
+  query GetRepo($name: ID!) { getGraph(name: $name) { name repoUrl repoBranch repoCommit repoPushedAt edgeSeenAt edgeSeenName } }
 `;
 const SAVE_GRAPH = /* GraphQL */ `
   mutation SaveGraph($name: String!, $ttl: String!, $baseVersion: Int!) {
@@ -290,6 +293,11 @@ export interface StoredGraph {
 }
 
 /** A space's A-Box (name = space id), or an empty one at version 0 when it does not exist yet. */
+/** A workspace's public repository and last edge use (ADR-0017, ADR-0018), without its Turtle. */
+export async function repoOf(name: string): Promise<Activity | null> {
+  return (await call<{ getGraph: Activity | null }>(GET_REPO, { name }, { quiet: true })).getGraph ?? null;
+}
+
 /** Per space of a tenant: when an edge last used it, its last change and what it holds (ADR-0018). */
 export async function graphActivity(tenantId: string): Promise<Record<string, Activity>> {
   const rows = await all_<Activity>(LIST_GRAPH_ACTIVITY, "listGraphs", { tenantId });

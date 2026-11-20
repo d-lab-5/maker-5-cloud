@@ -363,6 +363,7 @@ const routes: Array<[string, lambda.IFunction]> = [
   ["/edge/v1/graphs/list", backend.edgeGraphs.resources.lambda],
   ["/edge/v1/graphs/get", backend.edgeGraphs.resources.lambda],
   ["/edge/v1/graphs/put", backend.edgeGraphs.resources.lambda],
+  ["/edge/v1/repo", backend.edgeGraphs.resources.lambda],
   ["/edge/v1/models", backend.edgeModels.resources.lambda],
   ...["list", "get", "unit", "resolve", "product", "reserve", "release", "return", "boxes", "box", "propose", "categories", "idle"].map(
     (r) => [`/edge/v1/materials/${r}`, backend.edgeMaterials.resources.lambda] as [string, lambda.IFunction]),

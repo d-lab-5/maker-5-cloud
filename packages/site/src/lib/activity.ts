@@ -15,7 +15,15 @@ export interface Activity {
   updatedAt?: string | null;
   blocks?: number | null;
   modules?: number | null;
+  /** ADR-0017: where its design and code are public. */
+  repoUrl?: string | null;
+  repoBranch?: string | null;
+  repoCommit?: string | null;
+  repoPushedAt?: string | null;
 }
+
+/** "https://github.com/example-org/door-bell" → "example-org/door-bell". */
+export const repoName = (url?: string | null) => (url ?? "").replace(/^https:\/\/github\.com\//, "");
 
 export function isActive(a: Pick<Activity, "edgeSeenAt"> | undefined, now: number = Date.now()): boolean {
   const t = a?.edgeSeenAt ? Date.parse(a.edgeSeenAt) : NaN;

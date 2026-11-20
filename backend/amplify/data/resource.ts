@@ -84,6 +84,11 @@ const schema = a.schema({
       edgeSeenAt: a.datetime(),
       edgeSeenBy: a.string(),
       edgeSeenName: a.string(),
+      /** ADR-0017: its public repository, as its edge last pushed it. */
+      repoUrl: a.string(),
+      repoBranch: a.string(),
+      repoCommit: a.string(),
+      repoPushedAt: a.datetime(),
     })
     .identifier(["name"])
     .authorization((allow) => [

@@ -463,6 +463,10 @@
   "ws.boxes": "Boxes",
   "ws.boxes.count": "{n} inside",
   "ws.boxes.none": "No box is marked for this workspace yet.",
+  "ws.repo": "Design and code",
+  "ws.repo.hint": "Open: the software and the hardware model go to GitHub. Stock, places, prices and people stay here.",
+  "ws.repo.none": "Not on GitHub yet. Link it on the edge: Link to GitHub.",
+  "ws.repo.pushed": "pushed {when}",
   "ws.view.materials": "Materials",
   "ws.view.overview": "Overview"
 }

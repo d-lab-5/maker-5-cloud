@@ -5,7 +5,7 @@
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda";
 import { extractBearer, json, parseJsonBody, versionGate } from "../edge-shared/http";
 import { verifyDeviceToken } from "../edge-shared/registry";
-import { BadGraphRequest, getGraph, listGraphs, saveGraph, touchGraph } from "../graph-shared/store";
+import { BadGraphRequest, getGraph, listGraphs, repoProblem, saveGraph, setRepo, touchGraph } from "../graph-shared/store";
 import { getSpace, getTenant, spacesOfTenant } from "../shared/spaces";
 
 export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> => {
@@ -15,7 +15,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
   if (!verified.ok) {
     return verified.reason === "revoked" ? json(410, { error: "revoked" }) : json(401, { error: "invalid_token" });
   }
-  const body = parseJsonBody<{ name?: string; ttl?: string; baseVersion?: number }>(event) || {};
+  const body = parseJsonBody<{ name?: string; ttl?: string; baseVersion?: number; url?: string; branch?: string; commit?: string }>(event) || {};
   // ADR-0005: an edge reaches only its own tenant's graphs (one per space)
   const tenant = verified.row.tenant_id;
   if (!tenant) return json(403, { error: "no_tenant", message: "this edge belongs to no tenant yet; link it again" });
@@ -45,6 +45,15 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
       if (r.status === "conflict") return json(409, { error: "version_conflict", current: r.current });
       if (r.status === "invalid") return json(422, { error: "invalid", problems: r.problems });
       return json(200, r);
+    }
+    if (event.rawPath.endsWith("/repo")) {
+      // ADR-0017: where this workspace's design and code are public. The
+      // cloud keeps only the link; the edge pushes with the person's own login.
+      const problem = repoProblem(body);
+      if (problem) return json(400, { error: "invalid_request", message: problem });
+      const r = await setRepo(space.id, { url: body.url!, branch: body.branch!, commit: body.commit }, edge);
+      if (r === "missing") return json(409, { error: "not_synced", message: "sync the workspace before linking it" });
+      return json(200, { status: "ok" });
     }
     return json(404, { error: "not_found" });
   } catch (err) {
