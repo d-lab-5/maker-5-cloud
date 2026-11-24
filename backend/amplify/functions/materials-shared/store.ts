@@ -783,7 +783,7 @@ export async function saveBox(actor: Actor, tenantId: string, b: Record<string, 
  */
 export async function makeBoxes(actor: Actor, tenantId: string, b: Record<string, unknown>) {
   administers(actor, tenantId);
-  const taken = b.names ? [] : (await listBoxes(actor, tenantId)).map((x) => x.name);
+  const taken = b.names ? [] : (await listBoxes(actor, tenantId)).map((x) => x.name);   // the numbers in use
   const names = batchNames(b, taken);
   const out: Array<{ id: string; name: string; kind: Box["kind"]; code: string }> = [];
   for (const name of names) {

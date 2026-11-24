@@ -10,7 +10,7 @@
  * already starts lower (usedTop), so a part-used sheet is used up.
  */
 
-export type Size = "tiny" | "tag" | "article" | "box";
+export type Size = "tiny" | "tag" | "article" | "box" | "smallbox";
 
 /** A label's cell in mm, as Labels.tsx draws it. */
 export const CELL: Record<Size, { w: number; h: number }> = {
@@ -18,6 +18,7 @@ export const CELL: Record<Size, { w: number; h: number }> = {
   tag: { w: 31, h: 31 },
   article: { w: 70, h: 37 },
   box: { w: 63.5, h: 38.1 },
+  smallbox: { w: 38.1, h: 21.2 },
 };
 
 /** A4, a margin most printers reach, and room to cut between labels. */

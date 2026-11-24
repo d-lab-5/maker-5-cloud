@@ -102,8 +102,9 @@ export const bindCode = (tenantId: string, code: string, kind: "article" | "unit
 
 export const boxes = (tenantId: string, q = "", spaceId = "") => read<Box[]>("boxes", { tenantId, q, spaceId });
 export const box = (tenantId: string, id: string) => read<BoxDetail>("box", { tenantId, id });
+
 /** New boxes with their labels at once (an admin's): the names given, or n numbered "Box 01" on. */
-export const makeBoxes = (tenantId: string, b: { names?: string[]; n?: number; prefix?: string; kind: Box["kind"]; parentId?: string }) =>
+export const makeBoxes = (tenantId: string, b: { names?: string[]; n?: number; prefix?: string; start?: number; kind: Box["kind"]; parentId?: string }) =>
   change<Array<{ id: string; name: string; kind: Box["kind"]; code: string }>>("makeBoxes", { tenantId, ...b });
 export const saveBox = (tenantId: string, b: Partial<Box>) => change<Box>("saveBox", { tenantId, box: b });
 export const moveBox = (tenantId: string, id: string, to: { parentId?: string | null; location?: string }) => change("moveBox", { tenantId, id, ...to });

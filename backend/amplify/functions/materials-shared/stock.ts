@@ -200,11 +200,12 @@ export function boxFields(b: Record<string, unknown>, existing?: Box) {
 /**
  * The names of a batch of new boxes, made with their labels at once: the
  * names given (one a line), or `n` numbered after the highest of `prefix`
- * already taken ("Box 01" … "Box 21", then "Box 22" next time). Two digits,
+ * already taken ("Box 01" … "Box 21", then "Box 22" next time), or from
+ * `start`, never onto a name that is taken. Two digits,
  * so the labels sort; a number is what stays on the box while its contents
  * change.
  */
-export function batchNames(b: { names?: unknown; n?: unknown; prefix?: unknown }, taken: string[]): string[] {
+export function batchNames(b: { names?: unknown; n?: unknown; prefix?: unknown; start?: unknown }, taken: string[]): string[] {
   const given = (Array.isArray(b.names) ? b.names : String(b.names ?? "").split(/\r?\n/))
     .map((x) => text(x, 120)).filter((x): x is string => Boolean(x));
   if (given.length) {
@@ -217,7 +218,13 @@ export function batchNames(b: { names?: unknown; n?: unknown; prefix?: unknown }
   const esc = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const re = new RegExp(`^${esc} (\\d+)$`, "i");
   const top = taken.reduce((m, x) => Math.max(m, Number(re.exec(x)?.[1] ?? 0)), 0);
-  return Array.from({ length: n }, (_, i) => `${prefix} ${String(top + i + 1).padStart(2, "0")}`);
+  const asked = b.start === undefined || b.start === null || b.start === "" ? top + 1 : Math.floor(Number(b.start));
+  if (!(asked >= 1 && asked <= 9999)) throw new Refused("Numbers start at 1.");
+  const names = Array.from({ length: n }, (_, i) => `${prefix} ${String(asked + i).padStart(2, "0")}`);
+  const have = new Set(taken.map((x) => x.toLowerCase()));
+  const twice = names.find((x) => have.has(x.toLowerCase()));
+  if (twice) throw new Refused(`${twice} exists already: start after it.`);
+  return names;
 }
 
 /** A link a person adds to a box: an https URL of one of the known kinds. */

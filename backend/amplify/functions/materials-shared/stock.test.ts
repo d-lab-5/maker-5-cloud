@@ -60,6 +60,10 @@ test("a batch of boxes: the names given, or numbered after the highest taken", (
   assert.deepEqual(batchNames({ n: 3 }, []), ["Box 01", "Box 02", "Box 03"]);
   assert.deepEqual(batchNames({ n: 2 }, ["Box 07", "box 21", "Box 3a", "Toolbox 40"]), ["Box 22", "Box 23"]);
   assert.deepEqual(batchNames({ n: 1, prefix: "Bin (A)" }, ["Bin (A) 04"]), ["Bin (A) 05"]);
+  assert.deepEqual(batchNames({ n: 2, prefix: "Cabinet", start: 3 }, ["Cabinet 01", "Cabinet 02"]), ["Cabinet 03", "Cabinet 04"]);
+  assert.deepEqual(batchNames({ n: 1, prefix: "Cabinet", start: "" }, ["Cabinet 01", "Cabinet 02"]), ["Cabinet 03"]);
+  assert.throws(() => batchNames({ n: 2, prefix: "Cabinet", start: 2 }, ["Cabinet 01", "Cabinet 02"]), Refused, "never onto a taken name");
+  assert.throws(() => batchNames({ n: 1, start: 0 }, []), Refused);
   assert.throws(() => batchNames({ n: 0 }, []), Refused);
   assert.throws(() => batchNames({ n: MAX_BATCH + 1 }, []), Refused);
   assert.throws(() => batchNames({ names: Array.from({ length: MAX_BATCH + 1 }, (_, i) => `B${i}`) }, []), Refused);
