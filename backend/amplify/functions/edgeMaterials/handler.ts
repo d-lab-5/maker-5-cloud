@@ -3,13 +3,22 @@
 // reserves, releases and returns parts for that workspace's products. It
 // never edits the catalogue, receives stock or mints codes: a person does,
 // on the site. Every step is logged as edge:<id>.
+//
+// The intake (ADR-0022) is the exception, for the person at the edge: its
+// agent describes what was scanned at the shelf, and the person checks an
+// item in from the edge's page (the agent cannot: that call is not in the
+// chat's allowed list). Checking in makes the article and receives its
+// stock, so it is an admin's: the edge checks in only while the person who
+// linked it is an admin of its organisation with two-step sign-in, asked of
+// Cognito at each check-in (functions/edge-shared/linkedAdmin.ts).
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda";
 import { extractBearer, json, parseJsonBody, versionGate } from "../edge-shared/http";
 import { verifyDeviceToken } from "../edge-shared/registry";
+import { linkedAdmin } from "../edge-shared/linkedAdmin";
 import * as st from "../materials-shared/store";
 
 type Body = { q?: string; category?: string; id?: string; code?: string; spaceId?: string; articleId?: string;
-  qty?: number; unitId?: string; note?: string };
+  qty?: number; unitId?: string; note?: string; articles?: unknown; status?: string; suggestion?: Record<string, unknown> };
 
 export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> => {
   const tooOld = versionGate(event);
@@ -32,9 +41,29 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
     switch (route) {
       case "list": return json(200, { articles: await st.listArticles(actor, tenant, b.q ?? "", b.category ?? "") });
       case "get": return json(200, await st.article(actor, tenant, String(b.id ?? "")));
+      case "categories": return json(200, { categories: await st.categories(actor, tenant) });
+      case "idle": return json(200, { parts: await st.idle(actor, tenant, b.category ?? "") });
       case "unit": return json(200, await st.unit(actor, tenant, String(b.id ?? "")));
       case "resolve": return json(200, await st.resolve(actor, String(b.code ?? "")));
       case "product": return json(200, await st.spaceMaterials(actor, String(b.spaceId ?? "")));
+      // boxes, read only: the bench asks where a part is and where its files are
+      case "boxes": return json(200, { boxes: await st.listBoxes(actor, tenant, String(b.q ?? ""), String(b.spaceId ?? "")) });
+      case "box": {
+        const { box, ...rest } = await st.box(actor, tenant, String(b.id ?? ""));
+        return json(200, { ...rest, box: { ...box, files: (box.files ?? []).map(({ id, name, kind, size }) => ({ id, name, kind, size })) } });
+      }
+      // a BOM import proposes the articles it needs; an admin accepts them (ADR-0014)
+      case "propose": return json(200, await st.proposeArticles(actor, tenant, b.articles));
+      case "intake/list": return json(200, { items: await st.intakeList(actor, tenant, String(b.status ?? "")) });
+      case "intake/get": return json(200, await st.intakeGet(actor, tenant, String(b.id ?? "")));
+      case "intake/describe": return json(200, await st.intakeDescribe(actor, tenant, String(b.id ?? ""), b.suggestion ?? {}));
+      case "intake/checkin": {
+        if (!(await linkedAdmin(verified.row.linked_by_cognito_sub, tenant))) {
+          throw new st.Refused("Only the organisation's admins check in, with two-step sign-in: the person who linked this edge is not one.");
+        }
+        return json(200, await st.intakeCheckIn({ ...actor, admin: (t) => t === tenant }, tenant, String(b.id ?? ""), b.suggestion));
+      }
+      case "intake/drop": return json(200, await st.intakeDrop(actor, tenant, String(b.id ?? "")));
       case "reserve": case "release": case "return":
         return json(200, await st.step(actor, route, String(b.spaceId ?? ""), String(b.articleId ?? ""), b));
       default: return json(404, { error: "not_found" });

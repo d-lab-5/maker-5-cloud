@@ -254,8 +254,8 @@ spaceRead(backend.edgeDeviceApproval.resources.lambda, backend.edgeDeviceApprova
 // A-Boxes (ADR-0007): saveGraph for the browser, edgeGraphs for edges. Both
 // read and write the Graph table and nothing else; edgeGraphs also checks the
 // device token.
-allow(backend.graphs.resources.lambda, ["dynamodb:GetItem", "dynamodb:PutItem"], [graphTable.tableArn]);
-allow(backend.edgeGraphs.resources.lambda, ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Scan"], [graphTable.tableArn]);
+allow(backend.graphs.resources.lambda, ["dynamodb:GetItem", "dynamodb:UpdateItem"], [graphTable.tableArn]);
+allow(backend.edgeGraphs.resources.lambda, ["dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:Scan"], [graphTable.tableArn]);
 allow(backend.edgeGraphs.resources.lambda, ["dynamodb:GetItem"], [edgeRegistryTable.tableArn]);
 allow(backend.edgeModels.resources.lambda, ["dynamodb:GetItem"], [edgeRegistryTable.tableArn]);
 allow(backend.edgeMaterials.resources.lambda, ["dynamodb:GetItem"], [edgeRegistryTable.tableArn]);
@@ -297,31 +297,68 @@ const unitsTable = stockTable("MkUnits", "tenantId", "id");
 gsi(unitsTable, "byArticle", "articleId", "id");
 gsi(unitsTable, "bySpace", "spaceId", "id");
 gsi(unitsTable, "byParent", "parentId", "id");
+// One new index per table per deploy: CloudFormation adds a single GSI at a time.
+gsi(unitsTable, "byBox", "boxId", "id");
 const allocationsTable = stockTable("MkAllocations", "spaceId", "articleId");
 gsi(allocationsTable, "byArticle", "articleId", "spaceId");
 const movementsTable = stockTable("MkMovements", "tenantId", "sk");
 gsi(movementsTable, "byArticle", "articleId", "sk");
 gsi(movementsTable, "byUnit", "unitId", "sk");
 gsi(movementsTable, "bySpace", "spaceId", "sk");
+gsi(movementsTable, "byBox", "boxId", "sk");
 const codesTable = stockTable("MkCodes", "pk");
 gsi(codesTable, "byTarget", "target", "pk");
+// Boxes (ADR-0011 in maker-5-shared): what holds parts, and what is in each.
+const boxesTable = stockTable("MkBoxes", "tenantId", "id");
+gsi(boxesTable, "byParent", "parentId", "id");
+gsi(boxesTable, "bySpace", "spaceId", "id");
+const boxStockTable = stockTable("MkBoxStock", "boxId", "articleId");
+gsi(boxStockTable, "byArticle", "articleId", "boxId");
+// The intake (ADR-0022): what was scanned at the shelf, until it is checked in.
+const intakeTable = stockTable("MkIntake", "tenantId", "id");
 
-const stockTables = { ARTICLES: articlesTable, UNITS: unitsTable, ALLOCATIONS: allocationsTable, MOVEMENTS: movementsTable, CODES: codesTable };
+const stockTables = {
+  ARTICLES: articlesTable, UNITS: unitsTable, ALLOCATIONS: allocationsTable, MOVEMENTS: movementsTable, CODES: codesTable,
+  BOXES: boxesTable, BOXSTOCK: boxStockTable, INTAKE: intakeTable,
+};
 const withIndexes = (t: Table) => [t.tableArn, `${t.tableArn}/index/*`];
 for (const f of [backend.materials, backend.edgeMaterials]) {
   for (const [k, t] of Object.entries(stockTables)) f.addEnvironment(`${k}_TABLE_NAME`, t.tableName);
   spaceRead(f.resources.lambda, f);
 }
+// ADR-0018: which workspaces are passive, for the parts they hold (materials/idle)
+backend.edgeMaterials.addEnvironment("GRAPH_TABLE_NAME", graphTable.tableName);
+allow(backend.edgeMaterials.resources.lambda, ["dynamodb:Scan"], [graphTable.tableArn]);
 allow(backend.materials.resources.lambda,
   ["dynamodb:GetItem", "dynamodb:BatchGetItem", "dynamodb:Query", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:ConditionCheckItem"],
   Object.values(stockTables).flatMap(withIndexes));
 allow(backend.materials.resources.lambda, ["cognito-idp:AdminGetUser"], [anyUserPool(backend.materials.resources.lambda)]);
+// An empty box is deleted (an admin's step); nothing else in the stock is.
+allow(backend.materials.resources.lambda, ["dynamodb:DeleteItem"], [boxesTable.tableArn]);
+// A proposed article an admin turns down (ADR-0014): it never had stock.
+allow(backend.materials.resources.lambda, ["dynamodb:DeleteItem"], [articlesTable.tableArn]);
+// A box's files: under boxes/ only, never a space's object; the intake's photos under intake/.
+allow(backend.materials.resources.lambda, ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"], [`${bucket.bucketArn}/boxes/*`, `${bucket.bucketArn}/intake/*`]);
+backend.materials.addEnvironment("OBJECT_BUCKET_NAME", bucket.bucketName);
 // An edge reads everything and changes counts, units, allocations and the
 // log through its steps; it never writes codes.
 allow(backend.edgeMaterials.resources.lambda, ["dynamodb:GetItem", "dynamodb:BatchGetItem", "dynamodb:Query"],
   Object.values(stockTables).flatMap(withIndexes));
 allow(backend.edgeMaterials.resources.lambda, ["dynamodb:UpdateItem", "dynamodb:PutItem"],
   [articlesTable.tableArn, unitsTable.tableArn, allocationsTable.tableArn, movementsTable.tableArn]);
+// The intake (ADR-0022): the person at the edge checks items in, so the edge
+// also makes boxes and box lines, binds the scanned code and closes the item;
+// it reads the photos (signed links) and deletes them when an item is dropped.
+allow(backend.edgeMaterials.resources.lambda, ["dynamodb:UpdateItem", "dynamodb:PutItem", "dynamodb:ConditionCheckItem"],
+  [intakeTable.tableArn, boxesTable.tableArn, boxStockTable.tableArn, codesTable.tableArn]);
+allow(backend.edgeMaterials.resources.lambda, ["s3:GetObject", "s3:DeleteObject"], [`${bucket.bucketArn}/intake/*`]);
+backend.edgeMaterials.addEnvironment("OBJECT_BUCKET_NAME", bucket.bucketName);
+// checking in the intake is an admin's: the edge asks whether the person who
+// linked it is one (functions/edge-shared/linkedAdmin.ts). The edge stack may
+// name the pool: auth depends on neither the edge nor the data stack's functions.
+backend.edgeMaterials.addEnvironment("USER_POOL_ID", cfnUserPool.ref);
+allow(backend.edgeMaterials.resources.lambda, ["cognito-idp:ListUsers", "cognito-idp:AdminListGroupsForUser", "cognito-idp:AdminGetUser"],
+  [cfnUserPool.attrArn]);
 
 // The HTTP API. Paths are the wire contract; they do not move.
 const edgeApi = new HttpApi(edgeStack, "EdgeHttpApi", {
@@ -341,8 +378,10 @@ const routes: Array<[string, lambda.IFunction]> = [
   ["/edge/v1/graphs/list", backend.edgeGraphs.resources.lambda],
   ["/edge/v1/graphs/get", backend.edgeGraphs.resources.lambda],
   ["/edge/v1/graphs/put", backend.edgeGraphs.resources.lambda],
+  ["/edge/v1/repo", backend.edgeGraphs.resources.lambda],
   ["/edge/v1/models", backend.edgeModels.resources.lambda],
-  ...["list", "get", "unit", "resolve", "product", "reserve", "release", "return"].map(
+  ...["list", "get", "unit", "resolve", "product", "reserve", "release", "return", "boxes", "box", "propose", "categories", "idle",
+    "intake/list", "intake/get", "intake/describe", "intake/checkin", "intake/drop"].map(
     (r) => [`/edge/v1/materials/${r}`, backend.edgeMaterials.resources.lambda] as [string, lambda.IFunction]),
 ];
 for (const [path, fn] of routes) {

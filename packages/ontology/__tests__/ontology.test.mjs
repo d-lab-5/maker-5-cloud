@@ -53,3 +53,55 @@ test("a block names one article of the stock, with a whole quantity", async () =
     assert.equal((await validate(`${P}<https://maker-5.cloud/id/block/b-1> a m5:Block ; schema:name "x" ; ${bad} .`)).conforms, false, bad);
   }
 });
+
+test("a wire joins two pins of blocks, and a block's supply and place are one each (ADR-0014)", async () => {
+  const B = "https://maker-5.cloud/id/block";
+  const parts = `${P}<${B}/b-1> a m5:Block ; schema:name "Controller" ; m5:supplyState m5:SupplyToBuy ; m5:canvasX 40 ; m5:canvasY 80 .
+<${B}/b-2> a m5:Block ; schema:name "Opto" .
+<${B}/b-1#p11> a m5:Pin ; schema:name "GPIO17" ; m5:pinOf <${B}/b-1> ; m5:pinNumber 11 ; m5:pinRole m5:PinSignal .
+<${B}/b-2#p4> a m5:Pin ; schema:name "C" ; m5:pinOf <${B}/b-2> ; m5:pinNumber 4 .`;
+  const wire = `<https://maker-5.cloud/id/wire/w-1> a m5:Wire ; m5:wireColor "yellow" ;`;
+  assert.ok((await validate(`${parts}\n${wire} m5:wireEnd <${B}/b-1#p11> , <${B}/b-2#p4> .`)).conforms);
+  for (const bad of [`${wire} m5:wireEnd <${B}/b-1#p11> .`,
+                     `<${B}/b-3> a m5:Block ; schema:name "x" ; m5:supplyState m5:PinPower .`,
+                     `<${B}/b-1#p12> a m5:Pin ; schema:name "y" .`,
+                     `<${B}/b-1#p13> a m5:Pin ; schema:name "z" ; m5:pinOf <${B}/b-1> ; m5:pinRole m5:SupplyToBuy .`]) {
+    assert.equal((await validate(`${parts}\n${bad}`)).conforms, false, bad);
+  }
+});
+
+test("a block names at most one Fritzing part, by its file in the library", async () => {
+  const B = `${P}<https://maker-5.cloud/id/block/b-1> a m5:Block ; schema:name "Opto" ;`;
+  assert.ok((await validate(`${B} m5:fritzingPart "core/Sharp-PC817.fzp" .`)).conforms);
+  for (const bad of [`"https://example.org/x.fzp"`, `"obsolete/x.fzp"`, `"core/../x.fzp"`, `"core/a.fzp", "core/b.fzp"`]) {
+    assert.equal((await validate(`${B} m5:fritzingPart ${bad} .`)).conforms, false, bad);
+  }
+});
+
+test("ADR-0020: a block records the commit last deployed to it, and when", async () => {
+  const B = `${P}@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n<https://maker-5.cloud/id/block/b-1> a m5:Block ; schema:name "Pi" ;`;
+  const at = `"2026-11-20T12:00:00Z"^^xsd:dateTime`;
+  assert.ok((await validate(`${B} m5:deployedCommit "${"a".repeat(40)}" ; m5:deployedAt ${at} .`)).conforms);
+  assert.equal((await validate(`${B} m5:deployedCommit "abc" .`)).conforms, false);
+  assert.equal((await validate(`${B} m5:deployedAt "yesterday" .`)).conforms, false);
+});
+
+test("ADR-0021: a block's picture is a Wokwi element, drawn, or the agent's SVG", async () => {
+  const B = `${P}<https://maker-5.cloud/id/block/b-1> a m5:Block ; schema:name "Relay" ;`;
+  for (const ok of [`m5:partImage "wokwi:arduino-uno"`, `m5:partImage "drawn"`, `m5:partDrawing "<svg viewBox='0 0 10 10'></svg>"`]) {
+    assert.ok((await validate(`${B} ${ok} .`)).conforms, ok);
+  }
+  for (const bad of [`m5:partImage "https://example.org/x.svg"`, `m5:partImage "wokwi:Bad Name"`, `m5:partDrawing "<script/>"`,
+    `m5:partDrawing "<svg>${"x".repeat(40001)}</svg>"`]) {
+    assert.equal((await validate(`${B} ${bad} .`)).conforms, false, bad.slice(0, 40));
+  }
+});
+
+test("A pin is drawn left, right or at the bottom", async () => {
+  const B = `${P}<https://maker-5.cloud/id/block/b-1> a m5:Block ; schema:name "Relay" .
+    <https://maker-5.cloud/id/pin/b-1.1> a m5:Pin ; schema:name "IN" ; m5:pinOf <https://maker-5.cloud/id/block/b-1> ;`;
+  for (const ok of ["left", "right", "bottom"]) assert.ok((await validate(`${B} m5:pinSide "${ok}" .`)).conforms, ok);
+  assert.equal((await validate(`${B} m5:pinSide "top" .`)).conforms, false);
+  assert.ok((await validate(`${B} m5:pinSide "left" ; m5:pinPlace 3 .`)).conforms);
+  assert.equal((await validate(`${B} m5:pinPlace 0 .`)).conforms, false);
+});

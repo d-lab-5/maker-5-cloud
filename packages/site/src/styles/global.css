@@ -1146,6 +1146,12 @@ a {
 .mk-take { margin-top: 1rem; border-top: 1px solid var(--mk-border); padding-top: 0.5rem; }
 .mk-scanner { display: grid; gap: 0.5rem; margin: 0.75rem 0; }
 .mk-scanner__video { width: 100%; max-width: 28rem; border-radius: 10px; background: #000; }
+/* the intake (ADR-0022): place, then label after label */
+.mk-intake__place { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: baseline; margin-bottom: 0.5rem; }
+.mk-intake__item { display: grid; gap: 0.5rem; }
+.mk-intake__photo { cursor: pointer; text-align: center; }
+.mk-intake__done { margin-top: 1rem; border-top: 1px solid var(--mk-border); padding-top: 0.5rem; }
+.mk-intake__done li { display: flex; justify-content: space-between; gap: 0.5rem; }
 .mk-card .mk-facts { margin: 0.75rem 0; }
 .mk-card h1 { margin: 0.2rem 0 0.4rem; }
 .mk-card .mk-chip { margin: 0 0.3rem 0.3rem 0; text-decoration: none; }
@@ -1163,16 +1169,38 @@ a {
 .mk-sheet--tiny { grid-template-columns: repeat(auto-fill, 14mm); grid-auto-rows: 17mm; gap: 2mm; }
 .mk-sheet--tag { grid-template-columns: repeat(auto-fill, 31mm); grid-auto-rows: 31mm; gap: 2mm; }
 .mk-sheet--article { grid-template-columns: repeat(3, 70mm); grid-auto-rows: 37mm; padding: 0; gap: 0; }
+/* 63.5 x 38.1 mm address labels, 3 x 7 on A4: 15.15 mm top, 7.2 mm sides, 2.5 mm between columns */
+.mk-sheet--box { grid-template-columns: repeat(3, 63.5mm); grid-auto-rows: 38.1mm; padding: 15.15mm 7.2mm 0; column-gap: 2.5mm; row-gap: 0; }
+.mk-sheet--box .mk-label, .mk-label.mk-k-box { flex-direction: row; gap: 2.5mm; padding: 3mm; justify-content: flex-start; }
+.mk-sheet--box .mk-label__qr, .mk-k-box .mk-label__qr { flex: none; }
+.mk-sheet--box .mk-label__text, .mk-k-box .mk-label__text { align-items: flex-start; min-width: 0; gap: 1mm; }
+.mk-sheet--box .mk-label__title, .mk-k-box .mk-label__title { font-size: 11pt; font-weight: 700; text-align: left; line-height: 1.1; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.mk-sheet--box .mk-label__code, .mk-k-box .mk-label__code { font-size: 10pt; letter-spacing: .06em; }
+.mk-sheet--box .mk-label__sub, .mk-k-box .mk-label__sub { font-size: 7pt; overflow-wrap: anywhere; }
 .mk-label { display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; font-family: var(--mk-font-mono); }
-.mk-sheet--article .mk-label { flex-direction: row; gap: 3mm; padding: 3mm; justify-content: flex-start; }
+.mk-sheet--article .mk-label, .mk-label.mk-k-article { flex-direction: row; gap: 3mm; padding: 3mm; justify-content: flex-start; }
 .mk-label__qr svg { display: block; width: 100%; height: 100%; }
 .mk-label__text { display: flex; flex-direction: column; align-items: center; line-height: 1.15; }
-.mk-sheet--article .mk-label__text { align-items: flex-start; }
+.mk-sheet--article .mk-label__text, .mk-k-article .mk-label__text { align-items: flex-start; }
 .mk-label__code { font-size: 6pt; letter-spacing: 0.04em; }
-.mk-sheet--tag .mk-label__code, .mk-sheet--article .mk-label__code { font-size: 8pt; }
+.mk-sheet--tag .mk-label__code, .mk-k-tag .mk-label__code, .mk-sheet--article .mk-label__code, .mk-k-article .mk-label__code { font-size: 8pt; }
 .mk-label__title { font-family: var(--mk-font); font-size: 7pt; text-align: center; }
-.mk-sheet--article .mk-label__title { font-size: 10pt; font-weight: 600; text-align: left; }
+.mk-sheet--article .mk-label__title, .mk-k-article .mk-label__title { font-size: 10pt; font-weight: 600; text-align: left; }
 .mk-label__sub { font-size: 7pt; color: #333; }
+
+/* The print queue (ADR-0009): labels of every size packed on plain A4
+   sticker paper (lib/labelPack.ts), each at its place in mm, with cut guides. */
+.mk-label__mark { font-weight: 800; letter-spacing: 0; }
+.mk-qsheet { position: relative; width: 210mm; height: 297mm; box-sizing: border-box; background: #fff; color: #000;
+  margin: 0 0 1rem; box-shadow: var(--mk-shadow); overflow: hidden; }
+.mk-qcell { position: absolute; box-sizing: border-box; }
+.mk-qsheet--guides .mk-qcell { outline: 0.1mm dashed #9aa3ad; outline-offset: 0.9mm; }
+.mk-label.mk-k-tiny, .mk-label.mk-k-tag { gap: 0.5mm; }
+.mk-qsheet__used { position: absolute; left: 0; right: 0; top: 0; display: grid; place-items: center;
+  background: repeating-linear-gradient(45deg, #eef1f4 0 6px, #fff 6px 12px); color: #667; font: 9pt var(--mk-font); }
+.mk-lq-list { margin: 0 0 1rem; }
+.mk-lq-list ul { margin: 0.4rem 0 0; padding-left: 1.2rem; columns: 2 22rem; }
 
 @media print {
   @page { size: A4; margin: 0; }
@@ -1180,6 +1208,63 @@ a {
   body.mk-labels-open .mk-sheet, body.mk-labels-open .mk-sheet * { visibility: visible; }
   body.mk-labels-open .mk-labels { position: absolute; inset: 0; padding: 0; background: #fff; overflow: visible; }
   body.mk-labels-open .mk-sheet { position: absolute; left: 0; top: 0; }
+  body.mk-labels-open .mk-qsheet, body.mk-labels-open .mk-qsheet * { visibility: visible; }
+  body.mk-labels-open .mk-qsheet { margin: 0; box-shadow: none; break-after: page; }
+  body.mk-labels-open .mk-qsheet:last-of-type { break-after: auto; }
   .mk-noprint { display: none !important; }
 }
 
+
+/* Boxes (ADR-0011): the box card's contents, the materials tabs, and the
+   workspace list under its organisation. */
+.mk-org { margin: 0 0 1.5rem; }
+.mk-org__name { font-size: 0.95rem; font-weight: 600; color: var(--mk-text-muted); margin: 0 0 0.5rem; text-transform: none; }
+.mk-tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--mk-border); margin: 0 0 0.75rem; }
+.mk-tab { background: none; border: 0; border-bottom: 2px solid transparent; padding: 0.5rem 0.9rem; font: inherit; color: inherit; cursor: pointer; }
+.mk-tab--on { border-bottom-color: var(--mk-accent); font-weight: 600; }
+.mk-boxlist { list-style: none; padding: 0; margin: 0.25rem 0 0.75rem; }
+.mk-boxlist > li { padding: 0.45rem 0; border-bottom: 1px solid var(--mk-border); }
+.mk-boxlist__row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
+.mk-boxlist--inside { margin: 0.25rem 0 0 1.25rem; }
+.mk-boxlist--inside > li { border-bottom: 0; padding: 0.15rem 0; }
+.mk-boxcard h1 { overflow-wrap: anywhere; }
+.mk-boxcard .mk-boxlist__row .mk-button { padding: 0.3rem 0.7rem; }
+
+/* -- the landing page: active and passive workspaces (ADR-0018) ----------- */
+.mk-org__head { display: flex; align-items: center; gap: var(--mk-space-3); margin: 0 0 var(--mk-space-3); }
+.mk-split { display: grid; gap: var(--mk-space-6); grid-template-columns: 1fr 1fr; align-items: start; }
+.mk-split__half { min-width: 0; }
+.mk-split__title { font-size: 1.05rem; margin: 0; }
+.mk-split__hint { margin: 0.15rem 0 var(--mk-space-3); font-size: 0.85rem; }
+.mk-cards--one { grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); }
+@media (max-width: 760px) { .mk-split { grid-template-columns: 1fr; } }
+
+/* -- the catalogue: categories as tiles (ADR-0019) ------------------------- */
+.mk-crumbs { margin: var(--mk-space-2) 0; font-size: 0.9rem; }
+.mk-crumbs [aria-current="true"] { font-weight: 600; text-decoration: none; }
+.mk-tiles { list-style: none; margin: 0 0 var(--mk-space-4); padding: 0; display: grid; gap: var(--mk-space-3);
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); }
+.mk-tile { width: 100%; height: 100%; display: grid; gap: 0.2rem; align-content: start; text-align: left; cursor: pointer;
+  background: var(--mk-surface); color: inherit; border: 1px solid var(--mk-border); border-radius: var(--mk-radius);
+  padding: var(--mk-space-3); font: inherit; }
+.mk-tile:hover, .mk-tile:focus-visible { border-color: var(--mk-accent); }
+.mk-tile__name { font-weight: 600; }
+.mk-tile__n { color: var(--mk-text-muted); font-size: 0.85rem; }
+.mk-tile__subs { color: var(--mk-text-muted); font-size: 0.78rem; }
+.mk-tile--empty { opacity: 0.55; }
+
+/* the intake to check in, on Materials (ADR-0022) */
+.mk-intakebox__list li { display: block; }
+.mk-intakebox__row { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 0.5rem 0; font: inherit; color: inherit; cursor: pointer; }
+.mk-intakebox__item { padding: 0.25rem 0 0.75rem; }
+.mk-intakebox__photos { display: flex; gap: 0.4rem; overflow-x: auto; }
+.mk-intakebox__photos img { height: 9rem; border-radius: 6px; }
+.mk-intakebox__found li { padding: 0.15rem 0; }
+
+/* Scan on a computer: a QR for the phone; the phone's light sign-in */
+.mk-handoff { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin-bottom: 1rem; }
+.mk-handoff svg { flex: none; border-radius: 6px; }
+.mk-handoff > div { flex: 1 1 14rem; }
+.mk-gate--light { align-content: start; gap: var(--mk-space-4); padding: var(--mk-space-4); }
+.mk-gate--light .mk-gate__card { padding: var(--mk-space-6) var(--mk-space-4); box-shadow: none; }
+.mk-gate__brand { margin: var(--mk-space-4) 0 0; font-size: 1.25rem; }

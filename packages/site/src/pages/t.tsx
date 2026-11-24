@@ -3,9 +3,13 @@ import type { HeadFC, PageProps } from "gatsby";
 import { Shell } from "../components/Shell";
 import { hasNfc, writeTag } from "../components/Scanner";
 import { History } from "../components/History";
+import { BoxCard } from "../components/BoxCard";
+import { BindCard } from "../components/BindCard";
+import { UnitPicker } from "../components/UnitPicker";
 import * as m from "../lib/materials";
 import { listSpaces, type Space } from "../lib/data";
 import { useT } from "../lib/i18n";
+import { categoryName } from "@dlab5/maker-5-core";
 
 /**
  * The card a code opens (ADR-0009 in maker-5-shared): a label's QR, an NFC
@@ -15,6 +19,7 @@ import { useT } from "../lib/i18n";
  *
  *   /t/K7Q2M9  /T/K7Q2M9  /t/?c=<any code>     resolve a code
  *   /t/?w=<workspace>&u=<unit>                 a unit, from the stock page
+ *   /t/?w=<organisation>&x=<box>               a box (ADR-0011)
  *
  * A blank code of ours, or a code nobody knows yet (an EAN on a box, a
  * manufacturer's QR), is offered to be bound to an article or a unit.
@@ -22,15 +27,15 @@ import { useT } from "../lib/i18n";
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-function codeFromLocation(pathname: string, search: string): { code?: string; w?: string; u?: string } {
+function codeFromLocation(pathname: string, search: string): { code?: string; w?: string; u?: string; x?: string } {
   const p = new URLSearchParams(search);
   const path = /^\/t\/([^/]+)\/?$/i.exec(pathname);
-  return { code: p.get("c") ?? (path ? decodeURIComponent(path[1]) : undefined), w: p.get("w") ?? undefined, u: p.get("u") ?? undefined };
+  return { code: p.get("c") ?? (path ? decodeURIComponent(path[1]) : undefined), w: p.get("w") ?? undefined, u: p.get("u") ?? undefined, x: p.get("x") ?? undefined };
 }
 
 const CardPage: React.FC<PageProps> = ({ location }) => {
   const { t } = useT();
-  const [where, setWhere] = React.useState<{ code?: string; w?: string; u?: string }>({});
+  const [where, setWhere] = React.useState<{ code?: string; w?: string; u?: string; x?: string }>({});
   const [resolved, setResolved] = React.useState<m.Resolved | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   React.useEffect(() => {
@@ -42,12 +47,16 @@ const CardPage: React.FC<PageProps> = ({ location }) => {
   const unitRef = where.w && where.u ? { tenantId: where.w, id: where.u }
     : resolved?.status === "unit" ? { tenantId: resolved.tenantId, id: resolved.id } : null;
 
+  const boxRef = where.w && where.x ? { tenantId: where.w, id: where.x }
+    : resolved?.status === "box" ? { tenantId: resolved.tenantId, id: resolved.id } : null;
+
   return (
     <Shell active="scan" title={t("un.title")}>
       {error && <div className="mk-empty"><p className="mk-error" role="alert">{error}</p><p><a href="/scan/">{t("un.scanagain")}</a></p></div>}
-      {!error && !unitRef && !resolved && <p className="mk-muted">…</p>}
+      {!error && !unitRef && !boxRef && !resolved && <p className="mk-muted">…</p>}
+      {boxRef && <BoxCard tenantId={boxRef.tenantId} id={boxRef.id} />}
       {unitRef && <UnitCard tenantId={unitRef.tenantId} id={unitRef.id} />}
-      {resolved?.status === "article" && <ArticleCard tenantId={resolved.tenantId} id={resolved.id} />}
+      {resolved?.status === "article" && <ArticleCard tenantId={resolved.tenantId} id={resolved.id} serial={resolved.code.serial} />}
       {(resolved?.status === "blank" || resolved?.status === "unknown") && (
         <BindCard raw={where.code ?? ""} resolved={resolved} />
       )}
@@ -55,15 +64,17 @@ const CardPage: React.FC<PageProps> = ({ location }) => {
   );
 };
 
-function ArticleCard({ tenantId, id }: { tenantId: string; id: string }) {
-  const { t } = useT();
+function ArticleCard({ tenantId, id, serial }: { tenantId: string; id: string; serial?: string }) {
+  const { t, lang } = useT();
   const [d, setD] = React.useState<Awaited<ReturnType<typeof m.article>> | null>(null);
+  const [admin, setAdmin] = React.useState(false);
   React.useEffect(() => { void m.article(tenantId, id).then(setD); }, [tenantId, id]);
+  React.useEffect(() => { void m.stockWorkspaces().then((ws) => setAdmin(Boolean(ws.find((w) => w.id === tenantId)?.admin))); }, [tenantId]);
   if (!d) return <p className="mk-muted">…</p>;
   const a = d.article;
   return (
     <div className="mk-card">
-      <p className="mk-muted">{t(`cat.${a.category}`)}{a.manufacturer ? ` · ${a.manufacturer}` : ""}{a.mpn ? ` ${a.mpn}` : ""}</p>
+      <p className="mk-muted">{categoryName(a.category, lang, true)}{a.manufacturer ? ` · ${a.manufacturer}` : ""}{a.mpn ? ` ${a.mpn}` : ""}</p>
       <h1>{a.name}</h1>
       <dl className="mk-stats">
         <div className="mk-stat"><dt>{a.free}</dt><dd>{t("mt.free")}</dd></div>
@@ -71,14 +82,21 @@ function ArticleCard({ tenantId, id }: { tenantId: string; id: string }) {
         <div className="mk-stat"><dt>{a.onHand}</dt><dd>{t("mt.onhand")}</dd></div>
       </dl>
       {a.location && <p>{t("mt.f.location")}: <strong>{a.location}</strong></p>}
-      <TakeForProduct tenantId={tenantId} article={a} />
+      {d.boxes.length > 0 && <p>{t("bx.inboxes")}: {d.boxes.map((x) => (
+        <a key={x.boxId} href={m.boxHref(tenantId, x.boxId)} className="mk-chip">{x.name ?? x.boxId} · {x.qty}</a>
+      ))}</p>}
+      {a.tracking === "serial" ? (
+        // a product's barcode names the article; which unit is in the hand?
+        <UnitPicker tenantId={tenantId} articleId={a.id} serial={serial} admin={admin} action={t("un.open")}
+          onPick={(u) => window.location.assign(m.unitHref(tenantId, u.id))} />
+      ) : <TakeForProduct tenantId={tenantId} article={a} />}
       <p><a href={`/materials/?w=${tenantId}&a=${a.id}`}>{t("un.instock")}</a></p>
     </div>
   );
 }
 
 function UnitCard({ tenantId, id }: { tenantId: string; id: string }) {
-  const { t, date } = useT();
+  const { t, date, lang } = useT();
   const [d, setD] = React.useState<Awaited<ReturnType<typeof m.unit>> | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [ok, setOk] = React.useState<string | null>(null);
@@ -103,12 +121,14 @@ function UnitCard({ tenantId, id }: { tenantId: string; id: string }) {
 
   return (
     <div className="mk-card">
-      <p className="mk-muted">{d.article ? `${t(`cat.${d.article.category}`)} · ` : ""}{own ? <code className="mk-id">{own}</code> : null}</p>
-      <h1>{d.article?.name ?? u.articleId}</h1>
+      <p className="mk-muted">{d.article ? `${categoryName(d.article.category, lang, true)} · ` : ""}{own ? <code className="mk-id">{own}</code> : null}</p>
+      <h1>{u.name || d.article?.name || u.articleId}</h1>
+      {u.name && d.article && <p className="mk-muted">{d.article.name}</p>}
       {u.serial && <p>{t("un.serial")}: <strong>{u.serial}</strong></p>}
       <dl className="mk-facts">
         <dt>{t("un.state")}</dt><dd>{t(`state.${u.state}`)}{d.space ? <> · <a href={`/w/${d.space.id}/materials/`}>{d.space.name}</a></> : null}</dd>
-        <dt>{t("mt.f.location")}</dt><dd>{u.location ?? "—"}</dd>
+        <dt>{t("mt.f.location")}</dt><dd>{d.box ? <>{t("bx.inbox")} <a href={m.boxHref(tenantId, d.box.id)}>{d.box.name}</a></>
+          : u.holder ? t("bx.with", { name: u.holder.by }) : u.location ?? "—"}</dd>
         <dt>{t("un.inside")}</dt><dd>{d.parent ? <a href={m.unitHref(tenantId, d.parent.id)}>{d.parent.articleName ?? d.parent.id}{d.parent.serial ? ` · ${d.parent.serial}` : ""}</a> : "—"}</dd>
         <dt>{t("un.holds")}</dt><dd>{d.children.length ? d.children.map((c) => (
           <a key={c.id} href={m.unitHref(tenantId, c.id)} className="mk-chip">{c.articleName ?? c.id}{c.firmware ? ` · ${c.firmware.name} ${c.firmware.version}` : ""}</a>
@@ -125,7 +145,7 @@ function UnitCard({ tenantId, id }: { tenantId: string; id: string }) {
           {own && hasNfc() && (
             <button type="button" className="mk-button mk-button--ghost" onClick={() => {
               const lock = window.confirm(t("un.nfc.lock"));
-              void run(() => writeTag(m.labelUrl(own), lock), t("un.nfc.done"));
+              void run(() => writeTag(m.labelUrl(own).toLowerCase(), lock), t("un.nfc.done"));
             }}>{t("un.nfc")}</button>
           )}
         </div>
@@ -203,68 +223,6 @@ function TakeForProduct({ tenantId, article, unit, onDone }: { tenantId: string;
         ))}
       </div>
       {ok && <p className="mk-ok" role="status">{ok}</p>}
-      {error && <p className="mk-error" role="alert">{error}</p>}
-    </div>
-  );
-}
-
-/** A blank code of ours, or a code nobody here knows yet: bind it. */
-function BindCard({ raw, resolved }: { raw: string; resolved: m.Resolved }) {
-  const { t } = useT();
-  const [ws, setWs] = React.useState<m.StockWorkspace[]>([]);
-  const [w, setW] = React.useState(resolved.status === "blank" ? resolved.tenantId : "");
-  const [list, setList] = React.useState<m.Article[]>([]);
-  const [articleId, setArticleId] = React.useState("");
-  const [units, setUnits] = React.useState<m.Unit[]>([]);
-  const [target, setTarget] = React.useState("");
-  const [error, setError] = React.useState<string | null>(null);
-  React.useEffect(() => { void m.stockWorkspaces().then((x) => { setWs(x); if (!w && x[0]) setW(x[0].id); }); }, []);   // eslint-disable-line react-hooks/exhaustive-deps
-  React.useEffect(() => { if (w) void m.articles(w).then(setList); }, [w]);
-  const chosen = list.find((a) => a.id === articleId);
-  React.useEffect(() => {
-    setTarget(""); setUnits([]);
-    if (chosen?.tracking === "serial") void m.article(w, chosen.id).then((d) => setUnits(d.units.filter((u) => u.state !== "retired")));
-  }, [articleId]);   // eslint-disable-line react-hooks/exhaustive-deps
-  const admin = ws.find((x) => x.id === w)?.admin;
-  const bind = async () => {
-    setError(null);
-    try {
-      let kind: "article" | "unit" = "article";
-      let id = articleId;
-      if (chosen?.tracking === "serial") {
-        kind = "unit";
-        id = target === "new" ? (await m.receive(w, articleId, { qty: 1, note: t("un.bind.newnote") })).units[0].id : target;
-      }
-      await m.bindCode(w, raw, kind, id);
-      window.location.assign(kind === "unit" ? m.unitHref(w, id) : `/t/?c=${encodeURIComponent(raw)}`);
-    } catch (e) { setError(message(e)); }
-  };
-  const c = resolved.code;
-  return (
-    <div className="mk-card">
-      <p className="mk-muted">{c.kind === "m5" ? t("un.code.ours") : t(`un.code.${c.kind}`)}</p>
-      <h1><code className="mk-id">{c.kind === "m5" ? c.value : c.value.startsWith("sha256:") ? raw.slice(0, 60) : c.value}</code></h1>
-      <p>{resolved.status === "blank" ? t("un.blank") : t("un.unknown")}</p>
-      {ws.length > 1 && resolved.status !== "blank" && (
-        <select className="mk-select" value={w} onChange={(e) => setW(e.target.value)} aria-label={t("mt.workspace")}>
-          {ws.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-        </select>
-      )}
-      <form className="mk-form" onSubmit={(e) => { e.preventDefault(); void bind(); }}>
-        <select className="mk-select" value={articleId} onChange={(e) => setArticleId(e.target.value)} aria-label={t("mt.article")}>
-          <option value="">{t("un.bind.article")}</option>
-          {list.map((a) => <option key={a.id} value={a.id}>{a.name}{a.mpn ? ` · ${a.mpn}` : ""}</option>)}
-        </select>
-        {chosen?.tracking === "serial" && (
-          <select className="mk-select" value={target} onChange={(e) => setTarget(e.target.value)} aria-label={t("un.bind.unit")}>
-            <option value="">{t("un.bind.unit")}</option>
-            {admin && <option value="new">{t("un.bind.new")}</option>}
-            {units.map((u) => <option key={u.id} value={u.id}>{u.serial || u.id} · {t(`state.${u.state}`)}</option>)}
-          </select>
-        )}
-        <button type="submit" className="mk-button" disabled={!articleId || (chosen?.tracking === "serial" && !target)}>{t("un.bind")}</button>
-      </form>
-      {admin && <p className="mk-muted">{t("un.bind.missing")} <a href={`/materials/?w=${w}`}>{t("mt.title")}</a></p>}
       {error && <p className="mk-error" role="alert">{error}</p>}
     </div>
   );

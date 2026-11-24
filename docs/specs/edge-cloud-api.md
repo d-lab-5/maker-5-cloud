@@ -84,9 +84,12 @@ edits the catalogue, receives stock or mints codes. Every step is logged as
 | Route | Body | Answer |
 |---|---|---|
 | `materials/list` | `{q?, category?}` | `{articles: [{id, name, category, tracking, unit, manufacturer, mpn, location, onHand, reserved, free, low}]}` |
-| `materials/get` | `{id}` (an article) | `{article, units, allocations, movements, codes}` |
-| `materials/unit` | `{id}` (a unit) | `{unit, article, parent, children, movements, codes, space}` |
-| `materials/resolve` | `{code}` | `{status: "article" \| "unit" \| "blank" \| "unknown", code: {kind, value}, tenantId?, id?}`; a code is one of ours (`HTTPS://MAKER-5.CLOUD/T/K7Q2M9`), an EAN/GTIN, a maker's QR text, or `nfc:<uid>` |
+| `materials/get` | `{id}` (an article) | `{article, units, allocations, movements, codes, boxes}` |
+| `materials/unit` | `{id}` (a unit) | `{unit, article, parent, children, movements, codes, space, box}` |
+| `materials/resolve` | `{code}` | `{status: "article" \| "unit" \| "box" \| "blank" \| "unknown", code: {kind, value, serial?, batch?}, tenantId?, id?, articleId?}`; a GS1 code gives its GTIN (the article) and serial (the unit, ADR-0012); a code is one of ours (`HTTPS://MAKER5.CLOUD/T/K7Q2M9`, any of our hosts), an EAN/GTIN, a maker's QR text, or `nfc:<uid>` |
 | `materials/product` | `{spaceId}` | `{space, lines: [{articleId, reserved, consumed, article, units}], movements}` |
+| `materials/boxes` | `{q?, spaceId?}` | `{boxes: [{id, name, kind, parentId, parentName, location, spaceId, links, files}]}`, links and files as counts. Read only (ADR-0011) |
+| `materials/box` | `{id}` (a box, `x-…`) | `{box, path, space, boxes, units, lines, codes, movements}`; `box.links` in full, `box.files` as `{id, name, kind, size}` (no download URL) |
+| `materials/propose` | `{articles: [{name, category?, tracking?, unit?, manufacturer?, mpn?, note?}]}`, at most 50 | `{articles: [{id, name, status: "proposed" \| "exists"}]}`. A BOM import's missing articles (ADR-0014): made with no stock, marked proposed until an admin accepts them on Materials; a name already there returns the existing article. Refused above 200 waiting |
 | `materials/reserve`, `release`, `return` | `{spaceId, articleId, qty}` or `{spaceId, articleId, unitId}` | `{done, qty}` |
 

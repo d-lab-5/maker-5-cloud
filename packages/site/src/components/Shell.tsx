@@ -7,6 +7,7 @@ import { HelpSwitch } from "./Feedback";
 import { listSpaces } from "../lib/data";
 import type { Space } from "../lib/data";
 import { LangPicker, useT } from "../lib/i18n";
+import { byOrganisation, workspaceName } from "../lib/names";
 
 /**
  * The ONE application shell.
@@ -49,8 +50,8 @@ const icon = (path: React.ReactNode) => (
 );
 
 /**
- * The space's own views. Placeholders — this array and `toolItems` below
- * are the two a fork edits first.
+ * A workspace's views: its overview (boxes, links and files) and the parts
+ * it takes from the organisation's stock.
  *
  * Keep `key` in step with the `active` value each page passes to Shell, and
  * with the switch in pages/w.tsx. Three places, deliberately: a rail entry, a
@@ -74,68 +75,6 @@ export function railItems(id: string): RailItem[] {
         <>
           <path d="M3 8l9-5 9 5v8l-9 5-9-5z" />
           <path d="M3 8l9 5 9-5M12 13v8" />
-        </>
-      ),
-    },
-    {
-      key: "items",
-      label: "Items",
-      href: `/w/${id}/items/`,
-      icon: icon(
-        <>
-          <rect x="3" y="4" width="7" height="6" rx="1.4" />
-          <rect x="14" y="14" width="7" height="6" rx="1.4" />
-          <path d="M6.5 10v6h7.5" />
-        </>
-      ),
-    },
-    {
-      key: "reports",
-      label: "Reports",
-      href: `/w/${id}/reports/`,
-      icon: icon(
-        <>
-          <path d="M9 4h7l4 4v12a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z" />
-          <path d="M16 4v4h4" />
-          <path d="M11 13h6M11 17h4" />
-        </>
-      ),
-    },
-  ];
-}
-
-/**
- * Tools, kept apart from the views ON PURPOSE.
- *
- * The Space section answers "what does this look like"; these answer "how
- * do things get in and out of it". Mixing them turns a rail into a list of
- * eleven items with no shape, and buries an importer inside a screen where
- * nobody looking for one would think to check.
- */
-export function toolItems(id: string): RailItem[] {
-  return [
-    {
-      key: "import",
-      label: "Import",
-      href: `/w/${id}/import/`,
-      // An arrow entering a tray.
-      icon: icon(
-        <>
-          <path d="M12 3v10" />
-          <path d="m8 9 4 4 4-4" />
-          <path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2" />
-        </>
-      ),
-    },
-    {
-      key: "export",
-      label: "Export",
-      href: `/w/${id}/export/`,
-      icon: icon(
-        <>
-          <path d="M12 13V3" />
-          <path d="m8 7 4-4 4 4" />
-          <path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2" />
         </>
       ),
     },
@@ -169,7 +108,7 @@ function Mark() {
  * and a rail listing forty of them scrolls the appearance and account sections
  * off the bottom — at which point the rail has stopped being navigation. It
  * carries the current space inside itself, and rests unselected elsewhere.
- * With more than one tenant, the tenant's name prefixes each space.
+ * Workspaces sit under their organisation's name.
  */
 function SpaceSwitcher({ id }: { id?: string }) {
   const { t } = useT();
@@ -182,7 +121,6 @@ function SpaceSwitcher({ id }: { id?: string }) {
   }, []);
 
   const empty = spaces !== null && spaces.length === 0;
-  const manyTenants = new Set(spaces?.map((s) => s.tenantId)).size > 1;
 
   return (
     <div className="mk-rail__switcher">
@@ -213,10 +151,10 @@ function SpaceSwitcher({ id }: { id?: string }) {
         {id && !spaces?.some((s) => s.id === id) && (
           <option value={id}>{spaces === null ? t("lib.loading") : id}</option>
         )}
-        {spaces?.map((s) => (
-          <option key={s.id} value={s.id}>
-            {manyTenants && s.tenantName ? `${s.tenantName} · ` : ""}{s.name}
-          </option>
+        {spaces && byOrganisation(spaces).map((org) => (
+          <optgroup key={org.id} label={org.name}>
+            {org.spaces.map((s) => <option key={s.id} value={s.id}>{workspaceName(s, t)}</option>)}
+          </optgroup>
         ))}
       </select>
     </div>
@@ -300,9 +238,6 @@ export function Shell({ children, space, active, title }: ShellProps) {
             <SpaceSwitcher id={space.id} />
             <RailSection label={t("shell.space")}>
               <RailLinks items={railItems(space.id)} active={space.active} />
-            </RailSection>
-            <RailSection label={t("shell.tools")}>
-              <RailLinks items={toolItems(space.id)} active={space.active} />
             </RailSection>
           </>
         ) : (
