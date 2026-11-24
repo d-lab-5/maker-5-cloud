@@ -123,12 +123,14 @@ function PasswordField({
   value,
   onChange,
   autoComplete,
+  autoFocus,
 }: {
   id: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
   autoComplete: string;
+  autoFocus?: boolean;
 }) {
   const [shown, setShown] = React.useState(false);
   const { t } = useT();
@@ -144,6 +146,7 @@ function PasswordField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           required
+          autoFocus={autoFocus}
         />
         <button
           type="button"
@@ -179,8 +182,37 @@ function PasswordField({
 
 type Step = "password" | "newpassword" | "totp" | "totpsetup";
 
+/**
+ * Sent from a computer's Scan page (PhoneHandoff): the e-mail after `#u=`.
+ * Only the fragment, never the query, so it reaches no server log.
+ */
+function handedEmail(): string {
+  const m = /(?:^#|&)u=([^&]+)/.exec(window.location.hash);
+  if (!m) return "";
+  try { return decodeURIComponent(m[1]); } catch { return ""; }
+}
+
+/**
+ * A phone gets the form alone, without the landing around it: a narrow screen,
+ * or a page opened from a computer's QR.
+ */
+function useLight(): boolean {
+  const [light] = React.useState(() => Boolean(handedEmail()) || window.matchMedia("(max-width: 720px)").matches);
+  return light;
+}
+
+function Frame({ light, children }: { light: boolean; children: React.ReactNode }) {
+  return light ? (
+    <main className="mk-gate mk-gate--light">
+      <h1 className="mk-gate__brand">Maker-5</h1>
+      {children}
+    </main>
+  ) : <GuestLanding>{children}</GuestLanding>;
+}
+
 function SignInForm({ onSignedIn }: { onSignedIn: () => Promise<void> }) {
-  const [email, setEmail] = React.useState("");
+  const [email, setEmail] = React.useState(handedEmail);
+  const light = useLight();
   const [password, setPassword] = React.useState("");
   const [newPassword, setNewPassword] = React.useState("");
   const [code, setCode] = React.useState("");
@@ -211,6 +243,7 @@ function SignInForm({ onSignedIn }: { onSignedIn: () => Promise<void> }) {
       return next(await confirmSignIn({ challengeResponse: "TOTP" }));
     }
     if (s && s !== "DONE") throw new Error(t("auth.unsupportedstep", { step: s }));
+    if (handedEmail()) window.history.replaceState(null, "", window.location.pathname + window.location.search);
     await onSignedIn();
   }
 
@@ -234,19 +267,19 @@ function SignInForm({ onSignedIn }: { onSignedIn: () => Promise<void> }) {
 
   if (step === "totpsetup" && setup) {
     return (
-      <GuestLanding>
+      <Frame light={light}>
         <div className="mk-gate__card">
           <h2 className="mk-gate__title">{t("mfa.title")}</h2>
           <p className="mk-gate__subtitle">{t("mfa.required")}</p>
           <TotpEnroll uri={setup.uri} secret={setup.secret} busy={busy} error={error}
             onCode={(c) => void run(() => confirmSignIn({ challengeResponse: c }))} />
         </div>
-      </GuestLanding>
+      </Frame>
     );
   }
 
   return (
-    <GuestLanding>
+    <Frame light={light}>
       <form className="mk-gate__card" onSubmit={submit}>
         {/* h2, not h1: GuestLanding owns the page heading. A second h1 would
             leave the page with no single subject. */}
@@ -279,6 +312,7 @@ function SignInForm({ onSignedIn }: { onSignedIn: () => Promise<void> }) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                autoFocus={!email}
               />
             </label>
             <PasswordField
@@ -287,6 +321,7 @@ function SignInForm({ onSignedIn }: { onSignedIn: () => Promise<void> }) {
               autoComplete="current-password"
               value={password}
               onChange={setPassword}
+              autoFocus={Boolean(email)}
             />
           </>
         )}
@@ -301,7 +336,7 @@ function SignInForm({ onSignedIn }: { onSignedIn: () => Promise<void> }) {
           {busy ? t("auth.signingin") : step === "newpassword" ? t("auth.setpassword") : step === "totp" ? t("auth.confirmcode") : t("auth.signin")}
         </button>
       </form>
-    </GuestLanding>
+    </Frame>
   );
 }
 
@@ -359,6 +394,8 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const refresh = React.useCallback(async () => {
     try {
       const next = await readSession();
+      // signed in already: the e-mail a computer's QR carried is not needed
+      if (handedEmail()) window.history.replaceState(null, "", window.location.pathname + window.location.search);
       setSession(next);
       setState("in");
     } catch {

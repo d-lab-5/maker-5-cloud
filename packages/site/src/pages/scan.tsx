@@ -3,6 +3,7 @@ import type { HeadFC } from "gatsby";
 import { Shell } from "../components/Shell";
 import { CameraScanner, NfcReader } from "../components/Scanner";
 import { Intake } from "../components/Intake";
+import { PhoneHandoff, useComputer } from "../components/PhoneHandoff";
 import { cardHref } from "../lib/materials";
 import { useT } from "../lib/i18n";
 
@@ -15,6 +16,9 @@ import { useT } from "../lib/i18n";
  * Intake (?mode=intake, ADR-0022): the shelf or box first, then label after
  * label into it, each with a photo and a note if wanted, for the edge's agent
  * to describe and a person to check in.
+ *
+ * On a computer the page leads with a QR for the phone (PhoneHandoff), and
+ * this computer's camera waits behind a button.
  */
 const ScanPage: React.FC = () => {
   const { t } = useT();
@@ -26,6 +30,8 @@ const ScanPage: React.FC = () => {
     window.history.replaceState(null, "", x === "intake" ? "?mode=intake" : window.location.pathname);
   };
   const open = (raw: string) => window.location.assign(cardHref(raw.trim()));
+  const computer = useComputer();
+  const [here, setHere] = React.useState(false);
   return (
     <Shell active="scan" title={t("sc.title")}>
       <div className="mk-pagehead"><h1>{t("sc.title")}</h1>
@@ -34,7 +40,10 @@ const ScanPage: React.FC = () => {
           <button type="button" role="tab" aria-selected={mode === "intake"} className={`mk-seg__option${mode === "intake" ? " mk-seg__option--on" : ""}`} onClick={() => choose("intake")}>{t("sc.intake")}</button>
         </div>
       </div>
-      {mode === "intake" ? <Intake /> : <div className="mk-card">
+      {computer && <PhoneHandoff key={mode} path={mode === "intake" ? "/scan/?mode=intake" : "/scan/"} />}
+      {computer && !here ? (
+        <button type="button" className="mk-button mk-button--ghost" onClick={() => setHere(true)}>{t("ph.here")}</button>
+      ) : mode === "intake" ? <Intake /> : <div className="mk-card">
         <p className="mk-panel__hint">{t("sc.hint")}</p>
         <CameraScanner onFound={(raw) => open(raw)} />
         <NfcReader onFound={(raw) => open(raw)} />
