@@ -463,6 +463,8 @@ function ArticlePanel({ tenantId, id, admin, onChanged, onLabels }: {
       <p className="mk-panel__hint">
         {[categoryName(a.category, lang, true), a.manufacturer, a.mpn, a.location && `${t("mt.f.location")}: ${a.location}`].filter(Boolean).join(" · ")}
         {a.datasheet && <> · <a href={a.datasheet} target="_blank" rel="noreferrer">{t("mt.f.datasheet")}</a></>}
+        {(a.supplierRefs ?? []).map((r) => { const l = m.shopLink(r); return <React.Fragment key={r}> · {l.href
+          ? <a href={l.href} target="_blank" rel="noreferrer">{l.label}</a> : l.label}</React.Fragment>; })}
       </p>
       {a.note && <p className="mk-panel__hint">{a.note}</p>}
       {a.proposed && (

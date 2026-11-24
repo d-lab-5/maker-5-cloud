@@ -12,7 +12,7 @@ import { CATEGORY_LIST } from "./categories.generated";
 export class Refused extends Error {}
 
 const ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz";
-export const mintId = (prefix: "a" | "u" | "x" | "i") =>
+export const mintId = (prefix: "a" | "u" | "x" | "i" | "o") =>
   `${prefix}-${Array.from({ length: 10 }, () => ALPHABET[randomInt(ALPHABET.length)]).join("")}`;
 export const ARTICLE = /^a-[23456789abcdefghjkmnpqrstuvwxyz]{10}$/;
 export const UNIT = /^u-[23456789abcdefghjkmnpqrstuvwxyz]{10}$/;
@@ -56,6 +56,8 @@ export type Tracking = (typeof TRACKING)[number];
 export interface Article {
   tenantId: string; id: string; name: string; category: string; tracking: Tracking; unit: string;
   manufacturer?: string; mpn?: string; minStock?: number; location?: string; note?: string; datasheet?: string;
+  /** Where it was bought (ADR-0023): "amazon.de:B0…". */
+  supplierRefs?: string[];
   onHand: number; reserved: number; free: number;
   /** How many of onHand sit in boxes (ADR-0011); never more than onHand. */
   boxed?: number;
@@ -86,6 +88,19 @@ export function qty(v: unknown, what = "A quantity"): number {
   return n;
 }
 
+/** Where an article was bought: "<shop's domain>:<its article number>", as amazon.de:B0… (ADR-0023). */
+export const SUPPLIER_REF = /^[a-z0-9.-]{2,40}:[A-Z0-9][A-Z0-9-]{3,39}$/;
+export const MAX_SUPPLIER_REFS = 5;
+
+/** An article's shops, merged: no doubles, the newest last, at most five. */
+export function supplierRefs(had: unknown, more: unknown = []): string[] | undefined {
+  const all = [...(Array.isArray(had) ? had : []), ...(Array.isArray(more) ? more : [more])]
+    .map((x) => String(x ?? "").trim()).filter(Boolean);
+  for (const r of all) if (!SUPPLIER_REF.test(r)) throw new Refused(`${r} is no shop's article number (shop:NUMBER).`);
+  const out = [...new Set(all)].slice(-MAX_SUPPLIER_REFS);
+  return out.length ? out : undefined;
+}
+
 /** The fields a person may set on an article; counts are never set this way. */
 export function articleFields(a: Record<string, unknown>, existing?: Article) {
   const name = text(a.name ?? existing?.name, 120);
@@ -111,6 +126,7 @@ export function articleFields(a: Record<string, unknown>, existing?: Article) {
     note: text(a.note ?? existing?.note, 500),
     // m5, the maker's parts, or dhc, a smart-home device (ADR-0022); m5 when not said
     family: (a.family ?? existing?.family) === "dhc" ? "dhc" as const : undefined,
+    supplierRefs: supplierRefs(a.supplierRefs ?? existing?.supplierRefs),
   };
 }
 

@@ -39,6 +39,8 @@ export interface Suggestion {
   /** How sure the describer is, field by field. */
   sure?: Record<string, (typeof SURE)[number]>;
   note?: string;
+  /** The order line it arrived for (ADR-0023): check-in counts it there. */
+  orderLineId?: string;
 }
 export interface IntakeItem {
   tenantId: string; id: string;
@@ -88,8 +90,10 @@ export function suggestionFields(s: Record<string, unknown>, item: Pick<IntakeIt
   for (const [k, v] of Object.entries((s.sure ?? {}) as Record<string, unknown>).slice(0, 20)) {
     if ((SURE as readonly string[]).includes(String(v)) && /^[a-zA-Z.]{1,30}$/.test(k)) sure[k] = v as (typeof SURE)[number];
   }
+  const orderLineId = s.orderLineId ? String(s.orderLineId) : undefined;
+  if (orderLineId && !/^o-[23456789abcdefghjkmnpqrstuvwxyz]{10}$/.test(orderLineId)) throw new Refused("No such order line.");
   return {
-    what, articleId, article,
+    what, articleId, article, orderLineId,
     serial: text(s.serial, 80),
     qty: s.qty === undefined || s.qty === null || s.qty === "" ? undefined : qty(s.qty, "A count"),
     boxName: text(s.boxName, 120), boxKind, sure,
