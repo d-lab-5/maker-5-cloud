@@ -229,8 +229,8 @@ for (const fn of [backend.edgeDeviceAuthz, backend.edgeToken, backend.edgeTokenR
 // the local dev server for a personal sandbox (it has no public site).
 // APP_LINK_URL overrides both.
 const LINK_URLS: Record<string, string> = {
-  main: "https://maker-5.cloud/link",
-  stage: "https://stage.maker-5.cloud/link",
+  main: "https://maker5.cloud/link",
+  stage: "https://stage.maker5.cloud/link",
 };
 backend.edgeDeviceAuthz.addEnvironment(
   "LINK_URL",

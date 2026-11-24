@@ -2,6 +2,7 @@ import * as React from "react";
 import { Qr } from "./Qr";
 import { setUpTOTP, updateMFAPreference, verifyTOTPSetup } from "aws-amplify/auth";
 import { useT } from "../lib/i18n";
+import { totpIssuer } from "../lib/totp";
 
 /**
  * Two-step sign-in with an authenticator app (TOTP). Audit 2026-10-01, H-3.
@@ -14,7 +15,6 @@ import { useT } from "../lib/i18n";
  * so nothing is injected as HTML and the CSP needs no exception.
  */
 
-const APP = "maker5.cloud";   // the name an authenticator app shows; rename.mjs rewrites it
 
 
 /** The key in groups of four, easier to type than one long string. */
@@ -51,7 +51,7 @@ export function MfaSetup({ email, onDone }: { email?: string; onDone: () => void
 
   React.useEffect(() => {
     setUpTOTP()
-      .then((d) => setSetup({ uri: d.getSetupUri(APP, email).toString(), secret: d.sharedSecret }))
+      .then((d) => setSetup({ uri: d.getSetupUri(totpIssuer(), email).toString(), secret: d.sharedSecret }))
       .catch(fail);
   }, [email]);
 

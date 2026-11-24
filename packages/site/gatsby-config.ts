@@ -7,7 +7,7 @@ import type { GatsbyConfig } from "gatsby";
  * There is no sitemap or robots plugin here, and that is deliberate: every
  * route sits behind Cognito, so there is nothing for a crawler to index.
  */
-const siteUrl = process.env.GATSBY_SITE_URL || "https://maker-5.cloud";
+const siteUrl = process.env.GATSBY_SITE_URL || "https://maker5.cloud";
 
 const config: GatsbyConfig = {
   siteMetadata: {

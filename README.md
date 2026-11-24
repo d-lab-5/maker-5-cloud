@@ -1,7 +1,7 @@
 # Maker-5 cloud
 
 Cloud lifecycle portal and semantic graph engine for **Maker-5**, at
-**maker-5.cloud**. It orchestrates hardware and software product design with
+**maker5.cloud**. It orchestrates hardware and software product design with
 human-in-the-loop AI agents.
 
 The portal manages your product portfolio, system blueprints, architecture
