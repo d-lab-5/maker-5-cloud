@@ -353,6 +353,12 @@ allow(backend.edgeMaterials.resources.lambda, ["dynamodb:UpdateItem", "dynamodb:
   [intakeTable.tableArn, boxesTable.tableArn, boxStockTable.tableArn, codesTable.tableArn]);
 allow(backend.edgeMaterials.resources.lambda, ["s3:GetObject", "s3:DeleteObject"], [`${bucket.bucketArn}/intake/*`]);
 backend.edgeMaterials.addEnvironment("OBJECT_BUCKET_NAME", bucket.bucketName);
+// checking in the intake is an admin's: the edge asks whether the person who
+// linked it is one (functions/edge-shared/linkedAdmin.ts). The edge stack may
+// name the pool: auth depends on neither the edge nor the data stack's functions.
+backend.edgeMaterials.addEnvironment("USER_POOL_ID", cfnUserPool.ref);
+allow(backend.edgeMaterials.resources.lambda, ["cognito-idp:ListUsers", "cognito-idp:AdminListGroupsForUser", "cognito-idp:AdminGetUser"],
+  [cfnUserPool.attrArn]);
 
 // The HTTP API. Paths are the wire contract; they do not move.
 const edgeApi = new HttpApi(edgeStack, "EdgeHttpApi", {

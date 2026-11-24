@@ -1205,9 +1205,11 @@ export async function intakeDrop(actor: Actor, tenantId: string, id: string) {
  * transaction the article is found or made, the stock received, the unit or
  * the new box made in the place, or the parts counted into it, the code bound
  * and the item closed. A label known already moves its unit or box instead.
+  * Only the organisation's admins check in (with two-step sign-in, asked by the
+ * caller): anyone captures, describes and drops.
  */
 export async function intakeCheckIn(actor: Actor, tenantId: string, id: string, edits?: Record<string, unknown>) {
-  reads(actor, tenantId);
+  administers(actor, tenantId);        // it makes articles and receives stock: an admin's, as on the site
   const item = await mustIntake(tenantId, id);
   const s: Suggestion | undefined = edits ? suggestionFields(edits, item) : item.suggestion;
   const articleId = articleOf(item, s);

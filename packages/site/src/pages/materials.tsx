@@ -8,6 +8,7 @@ import * as m from "../lib/materials";
 import type { Article, StockWorkspace } from "../lib/materials";
 import { useT } from "../lib/i18n";
 import { EditBox } from "../components/BoxCard";
+import { IntakeInbox } from "../components/IntakeInbox";
 import { listSpaces, type Space } from "../lib/data";
 import { catalogue, categoryName, categoryOf, inCategory, subCategories, topCategories } from "@dlab5/maker-5-core";
 
@@ -23,6 +24,7 @@ import { catalogue, categoryName, categoryOf, inCategory, subCategories, topCate
  *   /materials/?w=<tenant>&a=<article>
  *   /materials/?w=<tenant>&c=controllers/sbc  one category of the catalogue
  *   /materials/?w=<tenant>&tab=boxes          the organisation's boxes (ADR-0011)
+ *   /materials/?w=<tenant>&tab=intake         what was scanned at the shelf, to check in (ADR-0022)
  */
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -48,7 +50,8 @@ const MaterialsPage: React.FC<PageProps> = () => {
   const [blankFamily, setBlankFamily] = React.useState<m.Family>("m5");
   const [error, setError] = React.useState<string | null>(null);
   const [queueOpen, setQueueOpen] = React.useState(false);
-  const [tab, setTab] = React.useState<"stock" | "boxes">(params().get("tab") === "boxes" ? "boxes" : "stock");
+  type Tab = "stock" | "boxes" | "intake";
+  const [tab, setTab] = React.useState<Tab>(() => { const v = params().get("tab"); return v === "boxes" || v === "intake" ? v : "stock"; });
 
   React.useEffect(() => {
     m.stockWorkspaces().then((ws) => {
@@ -62,7 +65,7 @@ const MaterialsPage: React.FC<PageProps> = () => {
     m.articles(w, q).then(setList).catch((e) => setError(message(e)));
   }, [w, q]);
   React.useEffect(() => { const id = window.setTimeout(load, q ? 250 : 0); return () => window.clearTimeout(id); }, [load, q]);
-  React.useEffect(() => { if (w) setParams({ w, a: open || undefined, c: cat || undefined, tab: tab === "boxes" ? "boxes" : undefined }); }, [w, open, cat, tab]);
+  React.useEffect(() => { if (w) setParams({ w, a: open || undefined, c: cat || undefined, tab: tab === "stock" ? undefined : tab }); }, [w, open, cat, tab]);
 
   const ws = workspaces?.find((x) => x.id === w);
   const counts = React.useMemo(() => catalogue(list ?? []), [list]);
@@ -96,8 +99,10 @@ const MaterialsPage: React.FC<PageProps> = () => {
         <nav className="mk-tabs mk-noprint" role="tablist">
           <button type="button" role="tab" aria-selected={tab === "stock"} className={tab === "stock" ? "mk-tab mk-tab--on" : "mk-tab"} onClick={() => setTab("stock")}>{t("bx.tab.stock")}</button>
           <button type="button" role="tab" aria-selected={tab === "boxes"} className={tab === "boxes" ? "mk-tab mk-tab--on" : "mk-tab"} onClick={() => setTab("boxes")}>{t("bx.tab")}</button>
+          <button type="button" role="tab" aria-selected={tab === "intake"} className={tab === "intake" ? "mk-tab mk-tab--on" : "mk-tab"} onClick={() => setTab("intake")}>{t("ib.tab")}</button>
         </nav>
       )}
+      {w && tab === "intake" && <IntakeInbox key={w} tenantId={w} admin={admin} />}
       {w && tab === "boxes" && <BoxesPanel tenantId={w} admin={admin} onLabels={(items) => setLabels({ items, layout: "box" })} />}
       {w && tab === "stock" && (
         <div className="mk-noprint">

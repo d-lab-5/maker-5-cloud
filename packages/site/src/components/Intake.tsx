@@ -90,7 +90,7 @@ export function Intake() {
               </li>
             ))}
           </ul>
-          <p className="mk-muted">{t("in.atEdge")}</p>
+          <p className="mk-muted">{t("in.atEdge")} <a href={`/materials/?w=${encodeURIComponent(place?.tenantId ?? done[0].tenantId)}&tab=intake`}>{t("in.toInbox")}</a></p>
         </div>
       )}
     </div>

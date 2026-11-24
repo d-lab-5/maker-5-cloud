@@ -12,8 +12,9 @@
 //   delete a box                          the organisation's admins, with two-step sign-in
 //   boxes: make, move, check in and out,
 //   links and files                       anyone in the organisation
-//   the intake: capture, describe,
-//   check in (ADR-0022)                   anyone in the organisation
+//   the intake (ADR-0022): capture,
+//   describe, drop                        anyone in the organisation
+//   the intake: check in                  the organisation's admins, with two-step sign-in
 
 import type { AppSyncIdentityCognito, AppSyncResolverEvent } from "aws-lambda";
 import { claimsOf, tenantsOf } from "../shared/claims";
@@ -24,7 +25,7 @@ import type { Step } from "../materials-shared/stock";
 
 type Args = { op?: string; args?: string | Record<string, unknown> };
 
-const ADMIN_OPS = new Set(["saveArticle", "acceptArticle", "dropProposed", "receive", "adjust", "retire", "mintCodes", "unbindCode", "deleteBox"]);
+const ADMIN_OPS = new Set(["saveArticle", "acceptArticle", "dropProposed", "receive", "adjust", "retire", "mintCodes", "unbindCode", "deleteBox", "intakeCheckIn"]);
 
 export const handler = async (event: AppSyncResolverEvent<Args>) => {
   const { groups, userPoolId, username } = claimsOf(event.identity);

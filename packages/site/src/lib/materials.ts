@@ -143,6 +143,13 @@ export const intake = (tenantId: string, status = "") => read<IntakeItem[]>("int
 export const intakeAdd = (tenantId: string, r: { code: string; placeId: string; note?: string; qty?: number }) =>
   change<IntakeItem>("intakeAdd", { tenantId, ...r });
 export const intakeDrop = (tenantId: string, id: string) => change("intakeDrop", { tenantId, id });
+export type IntakeSuggestion = NonNullable<IntakeItem["suggestion"]> & { note?: string };
+export const intakeGet = (tenantId: string, id: string) =>
+  read<{ item: IntakeItem; photos: Array<{ id: string; url: string }>; article: Article | null }>("intakeGet", { tenantId, id });
+export const intakeDescribe = (tenantId: string, id: string, suggestion: IntakeSuggestion) => change("intakeDescribe", { tenantId, id, suggestion });
+/** An admin's, with two-step sign-in: makes the article, receives the stock, puts it in the place. */
+export const intakeCheckIn = (tenantId: string, id: string, suggestion?: IntakeSuggestion) =>
+  change<{ item: string; kind: "unit" | "box" | "article"; id: string; articleId?: string }>("intakeCheckIn", { tenantId, id, suggestion });
 
 /** A photo for an item, shrunk in the browser to 1600 px at most, as JPEG, then sent straight to storage. */
 export async function intakePhoto(tenantId: string, id: string, file: File) {
