@@ -11,6 +11,7 @@ import {
 import { ADMIN_GROUP, tenantsOf, isMember } from "@dlab5/maker-5-core";
 import { GuestLanding } from "./GuestLanding";
 import { MfaSetup, TotpEnroll } from "./MfaSetup";
+import { totpIssuer } from "../lib/totp";
 import { useAccountLang, useT } from "../lib/i18n";
 import { isConfigured } from "../lib/amplify";
 
@@ -33,7 +34,6 @@ export interface Session {
 }
 
 /** The name an authenticator app shows next to the code. rename.mjs rewrites it. */
-const TOTP_ISSUER = "maker5.cloud";
 
 const AuthContext = React.createContext<Session | null>(null);
 
@@ -235,7 +235,7 @@ function SignInForm({ onSignedIn }: { onSignedIn: () => Promise<void> }) {
     if (s === "CONFIRM_SIGN_IN_WITH_TOTP_CODE") { setCode(""); setStep("totp"); setBusy(false); return; }
     if (s === "CONTINUE_SIGN_IN_WITH_TOTP_SETUP") {
       const d = (res.nextStep as { totpSetupDetails: { sharedSecret: string; getSetupUri: (a: string, b?: string) => URL } }).totpSetupDetails;
-      setSetup({ uri: d.getSetupUri(TOTP_ISSUER, email).toString(), secret: d.sharedSecret });
+      setSetup({ uri: d.getSetupUri(totpIssuer(), email).toString(), secret: d.sharedSecret });
       setStep("totpsetup"); setBusy(false); return;
     }
     if (s === "CONTINUE_SIGN_IN_WITH_MFA_SELECTION" || s === "CONTINUE_SIGN_IN_WITH_MFA_SETUP_SELECTION") {
