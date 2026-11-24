@@ -9,6 +9,12 @@ import { useT } from "../lib/i18n";
  * Each scan is an item at once; a photo, a note and a count can follow. The
  * edge's agent describes the items later, and a person checks them in there.
  * A blank label scanned as the place becomes a new shelf or box.
+ *
+ * Each scan says what it is: an existing article (its barcode or label is
+ * known), or a NEW one. A new one needs at least one photo, and a note helps:
+ * they are what the edge's agent describes it from. /scan/?mode=intake&code=…
+ * brings a code scanned elsewhere (a product's barcode nobody knows yet): it
+ * is added as soon as the place is scanned.
  */
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -24,6 +30,8 @@ export function Intake() {
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState("");
   const [typed, setTyped] = React.useState("");
+  const [pending, setPending] = React.useState("");
+  React.useEffect(() => { setPending(new URLSearchParams(window.location.search).get("code") ?? ""); }, []);
 
   const run = async (fn: () => Promise<void>) => {
     setError(""); setBusy(true);
@@ -48,6 +56,14 @@ export function Intake() {
   });
 
   const found = (raw: string) => (place ? scanned(raw) : atPlace(raw));
+  // a code brought from the scan page: in as soon as there is a place
+  React.useEffect(() => {
+    if (!place || !pending) return;
+    const code = pending;
+    setPending("");
+    window.history.replaceState(null, "", "?mode=intake");
+    void scanned(code);
+  }, [place, pending]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="mk-card mk-intake">
@@ -57,6 +73,7 @@ export function Intake() {
           <button type="button" className="mk-linkbutton" onClick={() => { setPlace(null); setItem(null); }}>{t("in.changePlace")}</button>
         </div>
       ) : <p className="mk-panel__hint">{t("in.hintPlace")}</p>}
+      {pending && !place && <p className="mk-panel__hint" role="status">{t("in.pending", { code: pending })}</p>}
 
       {blank && !place && <NewPlace blank={blank} onMade={(p) => { setBlank(null); setPlace(p); }} onCancel={() => setBlank(null)} />}
 
@@ -150,18 +167,26 @@ function Details({ item, onNext }: { item: m.IntakeItem; onNext: (x: m.IntakeIte
     } catch (e) { setError(message(e)); setBusy(false); }
   };
   const mark = item.code.kind === "m5" ? `${m.markOf(item.family)} ${item.code.value}` : item.code.value;
+  const k = item.known;
+  // a new article is described at the edge from its photos: at least one
+  const isNew = !k;
+  const needPhoto = isNew && photos === 0;
   return (
-    <form className="mk-form mk-intake__item" onSubmit={(e) => { e.preventDefault(); void next(); }}>
-      <p><code className="mk-id">{mark}</code> {item.known?.name ? <b>{item.known.name}</b> : <span className="mk-muted">{t("in.newItem")}</span>}
+    <form className="mk-form mk-intake__item" onSubmit={(e) => { e.preventDefault(); if (!needPhoto) void next(); }}>
+      <p><code className="mk-id">{mark}</code>{" "}
+        {k ? <b>{t(k.kind === "article" ? "in.isArticle" : k.kind === "box" ? "in.isBox" : "in.isUnit", { name: k.name ?? k.id })}</b>
+          : <b>{t("in.isNew")}</b>}
         {item.again && <span className="mk-muted"> · {t("in.again")}</span>}</p>
+      {isNew && <p className="mk-panel__hint">{t("in.newHint")}</p>}
       <label className="mk-button mk-button--ghost mk-intake__photo">
         {photos ? t("in.photoMore", { n: photos }) : t("in.photo")}
         <input type="file" accept="image/*" capture="environment" hidden disabled={busy || photos >= 3}
           onChange={(e) => { void photo(e.target.files?.[0]); e.target.value = ""; }} />
       </label>
-      <input className="mk-input" placeholder={t("in.note")} value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} aria-label={t("in.note")} />
+      <input className="mk-input" placeholder={t(isNew ? "in.noteNew" : "in.note")} value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} aria-label={t("in.note")} />
       <input className="mk-input mk-input--num" type="number" min={1} placeholder={t("in.qty")} value={qty} onChange={(e) => setQty(e.target.value)} aria-label={t("in.qty")} />
-      <button type="submit" className="mk-button" disabled={busy}>{t("in.next")}</button>
+      <button type="submit" className="mk-button" disabled={busy || needPhoto}>{t("in.next")}</button>
+      {needPhoto && <p className="mk-muted">{t("in.needPhoto")}</p>}
       {error && <p className="mk-error" role="alert">{error}</p>}
     </form>
   );

@@ -59,6 +59,10 @@ export function BindCard({ raw, resolved, onBound, inline }: {
       <Title><code className="mk-id">{c.kind === "m5" ? c.value : c.value.startsWith("sha256:") ? raw.slice(0, 60) : c.value}</code></Title>
       {(c.serial || c.batch) && <p className="mk-muted">{c.serial && <>{t("un.serial")}: <strong>{c.serial}</strong> </>}{c.batch && <>{t("un.batch")}: {c.batch}</>}</p>}
       <p>{resolved.status === "blank" ? t("un.blank") : product ? t("un.unknown.product") : t("un.unknown")}</p>
+      {product && !inline && (
+        // a product nobody has yet: a new article, made from photos and a note in the intake (ADR-0022)
+        <p><a className="mk-button" href={`/scan/?mode=intake&code=${encodeURIComponent(raw)}`}>{t("un.newViaIntake")}</a></p>
+      )}
       {ws.length > 1 && resolved.status !== "blank" && (
         <select className="mk-select" value={w} onChange={(e) => setW(e.target.value)} aria-label={t("mt.workspace")}>
           {ws.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
