@@ -27,7 +27,7 @@ import {
 } from "./intake";
 import {
   ARTICLE, BOX, MAX_FILE_BYTES, MAX_FILES, MAX_LINKS, LINK_KINDS, UNIT, Refused, UNIT_STEP, articleFields, boxFields, boxFits, boxable,
-  counts, fileName, linkFields, mintId, qty, wouldLoop, accepted, proposalFields, MAX_PROPOSED, MAX_BOX_DEPTH,
+  batchNames, counts, fileName, linkFields, mintId, qty, wouldLoop, accepted, proposalFields, MAX_PROPOSED, MAX_BOX_DEPTH,
   category as stockCategory, inCategory, catalogue,
   type Article, type Box, type BoxFile, type BoxLink, type Step, type Unit
 } from "./stock";
@@ -772,6 +772,27 @@ export async function saveBox(actor: Actor, tenantId: string, b: Record<string, 
     movement({ tenantId, kind: "box", boxId: item.id, qty: 0, by: actor.by, spaceId: f.spaceId, note: "new" }),
   ]);
   return item;
+}
+
+/**
+ * New boxes with their labels at once: each made, given a fresh code of ours
+ * and bound to it, so the sheet that comes back is printed and stuck on, and
+ * a scan opens the box. Its name, contents and the box it sits in come later,
+ * on the phone (the intake moves a scanned box into the place). An admin's,
+ * as minting is.
+ */
+export async function makeBoxes(actor: Actor, tenantId: string, b: Record<string, unknown>) {
+  administers(actor, tenantId);
+  const taken = b.names ? [] : (await listBoxes(actor, tenantId)).map((x) => x.name);
+  const names = batchNames(b, taken);
+  const out: Array<{ id: string; name: string; kind: Box["kind"]; code: string }> = [];
+  for (const name of names) {
+    const box = await saveBox(actor, tenantId, { name, kind: b.kind, parentId: b.parentId, spaceId: b.spaceId, location: b.location });
+    const [{ code }] = await mintCodes(actor, tenantId, 1, "m5");
+    await bindCode(actor, tenantId, code, "box", box.id);
+    out.push({ id: box.id, name: box.name, kind: box.kind, code });
+  }
+  return out;
 }
 
 /** Put a box into another box, or set it down at a place. */

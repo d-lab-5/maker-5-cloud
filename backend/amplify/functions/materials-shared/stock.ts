@@ -166,7 +166,9 @@ export const UNIT_STEP: Record<Step, { from: Unit["state"]; to: Unit["state"] }>
  * parts and other boxes, and keeps the links and files of what is in it.
  */
 
-export const BOX_KINDS = ["box", "bag", "folder", "drawer", "shelf"] as const;
+/** cabinet and bench are the top of a workshop: a wall cabinet, a workbench, holding shelves and boxes. */
+export const BOX_KINDS = ["box", "bag", "folder", "drawer", "shelf", "cabinet", "bench"] as const;
+export const MAX_BATCH = 48;
 export const LINK_KINDS = ["firmware", "cad", "schematic", "datasheet", "docs", "repo", "other"] as const;
 export const MAX_BOX_DEPTH = 8;
 export const MAX_LINKS = 30;
@@ -193,6 +195,29 @@ export function boxFields(b: Record<string, unknown>, existing?: Box) {
     location: text(b.location ?? existing?.location, 80),
     note: text(b.note ?? existing?.note, 1000),
   };
+}
+
+/**
+ * The names of a batch of new boxes, made with their labels at once: the
+ * names given (one a line), or `n` numbered after the highest of `prefix`
+ * already taken ("Box 01" … "Box 21", then "Box 22" next time). Two digits,
+ * so the labels sort; a number is what stays on the box while its contents
+ * change.
+ */
+export function batchNames(b: { names?: unknown; n?: unknown; prefix?: unknown }, taken: string[]): string[] {
+  const given = (Array.isArray(b.names) ? b.names : String(b.names ?? "").split(/\r?\n/))
+    .map((x) => text(x, 120)).filter((x): x is string => Boolean(x));
+  if (given.length) {
+    if (given.length > MAX_BATCH) throw new Refused(`At most ${MAX_BATCH} boxes at once.`);
+    return given;
+  }
+  const n = Math.floor(Number(b.n));
+  if (!(n >= 1 && n <= MAX_BATCH)) throw new Refused(`Between 1 and ${MAX_BATCH} boxes at once.`);
+  const prefix = text(b.prefix, 60) ?? "Box";
+  const esc = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`^${esc} (\\d+)$`, "i");
+  const top = taken.reduce((m, x) => Math.max(m, Number(re.exec(x)?.[1] ?? 0)), 0);
+  return Array.from({ length: n }, (_, i) => `${prefix} ${String(top + i + 1).padStart(2, "0")}`);
 }
 
 /** A link a person adds to a box: an https URL of one of the known kinds. */

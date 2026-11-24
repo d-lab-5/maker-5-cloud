@@ -203,6 +203,7 @@ function BoxesPanel({ tenantId, admin, onLabels }: { tenantId: string; admin: bo
   const [spaces, setSpaces] = React.useState<Space[]>([]);
   const [q, setQ] = React.useState("");
   const [adding, setAdding] = React.useState(false);
+  const [batch, setBatch] = React.useState(false);
   const [picked, setPicked] = React.useState<Set<string>>(new Set());
   const [error, setError] = React.useState<string | null>(null);
   const load = React.useCallback(() => { m.boxes(tenantId, q).then(setList).catch((e) => setError(message(e))); }, [tenantId, q]);
@@ -236,10 +237,13 @@ function BoxesPanel({ tenantId, admin, onLabels }: { tenantId: string; admin: bo
         <div className="mk-toolbar">
           <input className="mk-input" type="search" placeholder={t("bx.search")} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t("bx.search")} />
           <button type="button" className="mk-button" onClick={() => setAdding(!adding)}>{t("bx.new")}</button>
+          {admin && <button type="button" className="mk-button mk-button--ghost" onClick={() => setBatch(!batch)}>{t("bx.batch")}</button>}
           {admin && <button type="button" className="mk-button mk-button--ghost" disabled={!picked.size} onClick={() => void print()}>{t("bx.labels", { n: picked.size })}</button>}
         </div>
         {adding && <EditBox tenantId={tenantId} spaces={spaces} run={run}
           onSaved={(b) => { setAdding(false); window.location.assign(m.boxHref(tenantId, b.id)); }} />}
+        {batch && <BatchBoxes tenantId={tenantId} boxes={list ?? []} run={run}
+          onMade={(made, parent) => { setBatch(false); load(); onLabels(made.map((b) => ({ code: b.code, title: b.name, sub: parent ?? "" }))); }} />}
         {error && <p className="mk-error" role="alert">{error}</p>}
         <table className="mk-table">
           <thead><tr>
@@ -262,6 +266,70 @@ function BoxesPanel({ tenantId, admin, onLabels }: { tenantId: string; admin: bo
         </table>
       </div>
     </div>
+  );
+}
+
+/**
+ * New boxes with their labels at once: numbered ("Box 01" …, a sheet of 21
+ * by default) or named one a line (a wall cabinet, a workbench). Each gets
+ * its code now; what is in it and where it sits come later, by scanning.
+ */
+function BatchBoxes({ tenantId, boxes, run, onMade }: {
+  tenantId: string; boxes: m.Box[]; run: (fn: () => Promise<unknown>) => Promise<boolean>;
+  onMade: (made: Array<{ code: string; name: string }>, parent?: string) => void;
+}) {
+  const { t } = useT();
+  const [named, setNamed] = React.useState(false);
+  const [n, setN] = React.useState(21);
+  const [prefix, setPrefix] = React.useState(() => t("bx.batch.prefix"));
+  const [names, setNames] = React.useState("");
+  const [kind, setKind] = React.useState<m.Box["kind"]>("box");
+  const [parentId, setParentId] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  const make = async () => {
+    setBusy(true);
+    let made: Array<{ code: string; name: string }> = [];
+    const ok = await run(async () => {
+      made = await m.makeBoxes(tenantId, {
+        ...(named ? { names: names.split(/\r?\n/).map((x) => x.trim()).filter(Boolean) } : { n, prefix: prefix.trim() || undefined }),
+        kind, parentId: parentId || undefined,
+      });
+    });
+    setBusy(false);
+    if (ok) onMade(made, boxes.find((b) => b.id === parentId)?.name);
+  };
+  return (
+    <form className="mk-form mk-batchboxes" onSubmit={(e) => { e.preventDefault(); void make(); }}>
+      <p className="mk-panel__hint">{t("bx.batch.hint")}</p>
+      <div className="mk-seg" role="radiogroup" aria-label={t("bx.batch")}>
+        <button type="button" role="radio" aria-checked={!named} className={!named ? "mk-seg__option mk-seg__option--on" : "mk-seg__option"} onClick={() => setNamed(false)}>{t("bx.batch.numbered")}</button>
+        <button type="button" role="radio" aria-checked={named} className={named ? "mk-seg__option mk-seg__option--on" : "mk-seg__option"} onClick={() => { setNamed(true); if (kind === "box") setKind("cabinet"); }}>{t("bx.batch.named")}</button>
+      </div>
+      {named ? (
+        <label className="mk-field">{t("bx.batch.names")}
+          <textarea className="mk-input" rows={4} value={names} onChange={(e) => setNames(e.target.value)} placeholder={t("bx.batch.namesEg")} /></label>
+      ) : (
+        <div className="mk-toolbar">
+          <label className="mk-field">{t("bx.batch.n")}
+            <input className="mk-input mk-input--num" type="number" min={1} max={48} value={n} onChange={(e) => setN(Number(e.target.value))} /></label>
+          <label className="mk-field">{t("bx.batch.prefixLabel")}
+            <input className="mk-input" maxLength={60} value={prefix} onChange={(e) => setPrefix(e.target.value)} /></label>
+        </div>
+      )}
+      <div className="mk-toolbar">
+        <label className="mk-field">{t("bx.f.kind")}
+          <select className="mk-select" value={kind} onChange={(e) => setKind(e.target.value as m.Box["kind"])}>
+            {m.BOX_KINDS.map((k) => <option key={k} value={k}>{t(`bx.kind.${k}`)}</option>)}
+          </select></label>
+        <label className="mk-field">{t("bx.batch.inside")}
+          <select className="mk-select" value={parentId} onChange={(e) => setParentId(e.target.value)}>
+            <option value="">{t("bx.batch.top")}</option>
+            {boxes.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select></label>
+      </div>
+      <button type="submit" className="mk-button" disabled={busy || (named ? !names.trim() : !(n >= 1 && n <= 48))}>
+        {t("bx.batch.make", { n: named ? names.split(/\n/).filter((x) => x.trim()).length : n })}</button>
+    </form>
   );
 }
 

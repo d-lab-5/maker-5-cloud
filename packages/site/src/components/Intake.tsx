@@ -13,7 +13,7 @@ import { useT } from "../lib/i18n";
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 type Place = { tenantId: string; id: string; name: string };
-const PLACE_KINDS = ["shelf", "box", "drawer", "bag", "folder"] as const;
+const PLACE_KINDS = ["shelf", "box", "drawer", "bag", "folder", "cabinet", "bench"] as const;
 
 export function Intake() {
   const { t } = useT();

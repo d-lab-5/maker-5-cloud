@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ARTICLE, BOX, MAX_BOX_DEPTH, MAX_PROPOSE, UNIT, Refused, accepted, proposalFields, boxFields, boxFits, boxable, fileName, linkFields, UNIT_STEP, articleFields, counts, mintId, qty, wouldLoop, type Article } from "./stock";
+import { ARTICLE, BOX, MAX_BATCH, batchNames, MAX_BOX_DEPTH, MAX_PROPOSE, UNIT, Refused, accepted, proposalFields, boxFields, boxFits, boxable, fileName, linkFields, UNIT_STEP, articleFields, counts, mintId, qty, wouldLoop, type Article } from "./stock";
 
 // Stock rules (ADR-0008, ADR-0010 in maker-5-shared).
 
@@ -53,6 +53,18 @@ test("a box is minted, named and of a known kind", () => {
     { name: "Doorbell prototype", kind: "box", spaceId: undefined, location: "Shelf B", note: undefined });
   assert.throws(() => boxFields({ name: "" }), Refused);
   assert.throws(() => boxFields({ name: "Crate", kind: "crate" }), Refused);
+});
+
+test("a batch of boxes: the names given, or numbered after the highest taken", () => {
+  assert.deepEqual(batchNames({ names: "Wall cabinet\n  \nElectronics bench \r\nCabinet" }, []), ["Wall cabinet", "Electronics bench", "Cabinet"]);
+  assert.deepEqual(batchNames({ n: 3 }, []), ["Box 01", "Box 02", "Box 03"]);
+  assert.deepEqual(batchNames({ n: 2 }, ["Box 07", "box 21", "Box 3a", "Toolbox 40"]), ["Box 22", "Box 23"]);
+  assert.deepEqual(batchNames({ n: 1, prefix: "Bin (A)" }, ["Bin (A) 04"]), ["Bin (A) 05"]);
+  assert.throws(() => batchNames({ n: 0 }, []), Refused);
+  assert.throws(() => batchNames({ n: MAX_BATCH + 1 }, []), Refused);
+  assert.throws(() => batchNames({ names: Array.from({ length: MAX_BATCH + 1 }, (_, i) => `B${i}`) }, []), Refused);
+  assert.equal(boxFields({ name: "Wall cabinet", kind: "cabinet" }).kind, "cabinet");
+  assert.equal(boxFields({ name: "Electronics bench", kind: "bench" }).kind, "bench");
 });
 
 test("a box never goes inside itself, and nests at most eight deep", () => {
