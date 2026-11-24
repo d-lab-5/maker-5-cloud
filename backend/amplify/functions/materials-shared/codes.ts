@@ -30,6 +30,17 @@ export const OWN = /^[0-9A-HJKMNP-TV-Z]{6}$/;
 export const LABEL_HOST = "MAKER5.CLOUD";
 
 export type CodeKind = "m5" | "ean" | "qr" | "nfc";
+/**
+ * Which inventory a code of ours is for, chosen when its batch is minted
+ * (ADR-0022): m5, the maker's parts, or dhc, devices a smart home can use (a
+ * PC, a power supply). Both are the same kind of code; only the printed mark
+ * differs, so a scanner reads either.
+ */
+export const FAMILIES = ["m5", "dhc"] as const;
+export type Family = (typeof FAMILIES)[number];
+export const family = (v: unknown): Family => (v === "dhc" ? "dhc" : "m5");
+/** The mark printed before the code: "M5 K7Q2M9", "DHC K7Q2M9". */
+export const markOf = (f: Family) => (f === "dhc" ? "DHC" : "M5");
 /** A code; a GS1 code also carries the serial number and batch it names, beside its GTIN. */
 export interface Code { kind: CodeKind; value: string; serial?: string; batch?: string }
 
@@ -127,8 +138,8 @@ export function normalise(raw: string): Code {
   const url = OUR_URL.exec(s) ?? LOCAL_URL.exec(s);
   if (url) return { kind: "m5", value: crockford(url[1]) };
   if (OWN.test(crockford(s)) && s.length === 6) return { kind: "m5", value: crockford(s) };
-  // as printed under the QR: "M5 K7Q2M9" (the mark tells a Maker-5 label from another system's)
-  const marked = /^M5[\s·:\-]?([0-9A-Za-z]{6})$/i.exec(s);
+  // as printed under the QR: "M5 K7Q2M9" or "DHC K7Q2M9" (the mark tells the inventory)
+  const marked = /^(?:M5|DHC)[\s·:\-]?([0-9A-Za-z]{6})$/i.exec(s);
   if (marked && OWN.test(crockford(marked[1]))) return { kind: "m5", value: crockford(marked[1]) };
   const nfc = /^nfc:\s*((?:[0-9a-f]{2}[:\-\s]?){4,10})$/i.exec(s);
   if (nfc) return { kind: "nfc", value: nfc[1].replace(/[:\-\s]/g, "").toUpperCase() };

@@ -314,10 +314,12 @@ gsi(boxesTable, "byParent", "parentId", "id");
 gsi(boxesTable, "bySpace", "spaceId", "id");
 const boxStockTable = stockTable("MkBoxStock", "boxId", "articleId");
 gsi(boxStockTable, "byArticle", "articleId", "boxId");
+// The intake (ADR-0022): what was scanned at the shelf, until it is checked in.
+const intakeTable = stockTable("MkIntake", "tenantId", "id");
 
 const stockTables = {
   ARTICLES: articlesTable, UNITS: unitsTable, ALLOCATIONS: allocationsTable, MOVEMENTS: movementsTable, CODES: codesTable,
-  BOXES: boxesTable, BOXSTOCK: boxStockTable,
+  BOXES: boxesTable, BOXSTOCK: boxStockTable, INTAKE: intakeTable,
 };
 const withIndexes = (t: Table) => [t.tableArn, `${t.tableArn}/index/*`];
 for (const f of [backend.materials, backend.edgeMaterials]) {
@@ -335,8 +337,8 @@ allow(backend.materials.resources.lambda, ["cognito-idp:AdminGetUser"], [anyUser
 allow(backend.materials.resources.lambda, ["dynamodb:DeleteItem"], [boxesTable.tableArn]);
 // A proposed article an admin turns down (ADR-0014): it never had stock.
 allow(backend.materials.resources.lambda, ["dynamodb:DeleteItem"], [articlesTable.tableArn]);
-// A box's files: under boxes/ only, never a space's object.
-allow(backend.materials.resources.lambda, ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"], [`${bucket.bucketArn}/boxes/*`]);
+// A box's files: under boxes/ only, never a space's object; the intake's photos under intake/.
+allow(backend.materials.resources.lambda, ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"], [`${bucket.bucketArn}/boxes/*`, `${bucket.bucketArn}/intake/*`]);
 backend.materials.addEnvironment("OBJECT_BUCKET_NAME", bucket.bucketName);
 // An edge reads everything and changes counts, units, allocations and the
 // log through its steps; it never writes codes.
@@ -344,6 +346,13 @@ allow(backend.edgeMaterials.resources.lambda, ["dynamodb:GetItem", "dynamodb:Bat
   Object.values(stockTables).flatMap(withIndexes));
 allow(backend.edgeMaterials.resources.lambda, ["dynamodb:UpdateItem", "dynamodb:PutItem"],
   [articlesTable.tableArn, unitsTable.tableArn, allocationsTable.tableArn, movementsTable.tableArn]);
+// The intake (ADR-0022): the person at the edge checks items in, so the edge
+// also makes boxes and box lines, binds the scanned code and closes the item;
+// it reads the photos (signed links) and deletes them when an item is dropped.
+allow(backend.edgeMaterials.resources.lambda, ["dynamodb:UpdateItem", "dynamodb:PutItem", "dynamodb:ConditionCheckItem"],
+  [intakeTable.tableArn, boxesTable.tableArn, boxStockTable.tableArn, codesTable.tableArn]);
+allow(backend.edgeMaterials.resources.lambda, ["s3:GetObject", "s3:DeleteObject"], [`${bucket.bucketArn}/intake/*`]);
+backend.edgeMaterials.addEnvironment("OBJECT_BUCKET_NAME", bucket.bucketName);
 
 // The HTTP API. Paths are the wire contract; they do not move.
 const edgeApi = new HttpApi(edgeStack, "EdgeHttpApi", {
@@ -365,7 +374,8 @@ const routes: Array<[string, lambda.IFunction]> = [
   ["/edge/v1/graphs/put", backend.edgeGraphs.resources.lambda],
   ["/edge/v1/repo", backend.edgeGraphs.resources.lambda],
   ["/edge/v1/models", backend.edgeModels.resources.lambda],
-  ...["list", "get", "unit", "resolve", "product", "reserve", "release", "return", "boxes", "box", "propose", "categories", "idle"].map(
+  ...["list", "get", "unit", "resolve", "product", "reserve", "release", "return", "boxes", "box", "propose", "categories", "idle",
+    "intake/list", "intake/get", "intake/describe", "intake/checkin", "intake/drop"].map(
     (r) => [`/edge/v1/materials/${r}`, backend.edgeMaterials.resources.lambda] as [string, lambda.IFunction]),
 ];
 for (const [path, fn] of routes) {

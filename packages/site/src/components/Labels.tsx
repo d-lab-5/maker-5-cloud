@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Qr } from "./Qr";
-import { labelUrl } from "../lib/materials";
+import { labelUrl, markOf, type Family } from "../lib/materials";
 import { useT } from "../lib/i18n";
 import { A4, pack } from "../lib/labelPack";
 import { clearQueue, dequeue, enqueue, setUsedTop, usedTop, useQueue, type Queued } from "../lib/labelQueue";
@@ -16,9 +16,10 @@ import { clearQueue, dequeue, enqueue, setUsedTop, usedTop, useQueue, type Queue
  *             30 mm QR, read from a shelf 30 to 40 cm away, the box's name
  *             in bold, its code and workspace; for a carton, a bag, a drawer
  *
- * Every label prints its code as "M5 K7Q2M9": the mark tells a Maker-5 label
- * from another system's QR at a glance (the QR itself holds our URL, and a
- * code typed with its mark is found too).
+ * Every label prints its code as "M5 K7Q2M9", or "DHC K7Q2M9" for a code
+ * minted for smart-home devices (ADR-0022): the mark tells which inventory a
+ * label belongs to at a glance (the QR itself holds our URL, and a code typed
+ * with its mark is found too).
  *
  * Two ways to print: a die-cut sheet of one layout (LabelSheet, with "skip"
  * for labels already used), or the print queue on plain sticker paper
@@ -30,7 +31,7 @@ import { clearQueue, dequeue, enqueue, setUsedTop, usedTop, useQueue, type Queue
  * Print at 100 % ("actual size"), never "fit to page".
  */
 
-export interface LabelItem { code: string; title?: string; sub?: string }
+export interface LabelItem { code: string; title?: string; sub?: string; family?: Family }
 export type Layout = "tiny" | "tag" | "article" | "box";
 
 const SIZE: Record<Layout, { qr: number; ecc: "L" | "M" }> = {
@@ -49,7 +50,7 @@ function Label({ x, kind, className = "", style }: { x: LabelItem; kind: Layout;
         <Qr text={labelUrl(x.code)} size="100%" ecc={s.ecc} quiet={kind === "tiny" ? 1 : 2} label={x.code} />
       </div>
       <div className="mk-label__text">
-        <span className="mk-label__code"><b className="mk-label__mark">M5</b> {x.code}</span>
+        <span className="mk-label__code"><b className="mk-label__mark">{markOf(x.family)}</b> {x.code}</span>
         {kind !== "tiny" && x.title && <span className="mk-label__title">{x.title}</span>}
         {(kind === "article" || kind === "box") && x.sub && <span className="mk-label__sub">{x.sub}</span>}
       </div>

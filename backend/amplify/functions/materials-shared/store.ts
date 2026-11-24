@@ -11,6 +11,7 @@
 //   MkCodes        pk                              m5:XXXXXX, or tenantId#ean:…; byTarget
 //   MkBoxes        tenantId, id                    boxes (ADR-0011); byParent, bySpace
 //   MkBoxStock     boxId, articleId                counted parts in a box; byArticle
+//   MkIntake       tenantId, id                    what was scanned at the shelf, to check in (ADR-0022)
 
 import { randomBytes } from "node:crypto";
 import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
@@ -20,10 +21,13 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { doc, getSpace, spacesOfTenant, type Space } from "../shared/spaces";
 import { activeAt, edgeSeen } from "../graph-shared/activity";
-import { BadCode, codeKey, labelUrl, mintOwn, normalise, type Code } from "./codes";
+import { BadCode, codeKey, family as familyOf, labelUrl, mintOwn, normalise, type Code, type Family } from "./codes";
+import {
+  MAX_PHOTOS, articleOf, captureFields, photoFields, plan, suggestionFields, type IntakeItem, type Status, type Suggestion,
+} from "./intake";
 import {
   ARTICLE, BOX, MAX_FILE_BYTES, MAX_FILES, MAX_LINKS, LINK_KINDS, UNIT, Refused, UNIT_STEP, articleFields, boxFields, boxFits, boxable,
-  counts, fileName, linkFields, mintId, qty, wouldLoop, accepted, proposalFields, MAX_PROPOSED,
+  counts, fileName, linkFields, mintId, qty, wouldLoop, accepted, proposalFields, MAX_PROPOSED, MAX_BOX_DEPTH,
   category as stockCategory, inCategory, catalogue,
   type Article, type Box, type BoxFile, type BoxLink, type Step, type Unit
 } from "./stock";
@@ -38,6 +42,7 @@ const T = {
   codes: () => process.env.CODES_TABLE_NAME!,
   boxes: () => process.env.BOXES_TABLE_NAME!,
   boxStock: () => process.env.BOXSTOCK_TABLE_NAME!,
+  intake: () => process.env.INTAKE_TABLE_NAME!,
 };
 
 /** Who is asking, and what they may do. */
@@ -246,15 +251,16 @@ export async function resolve(actor: Actor, raw: string) {
   const tenants = code.kind === "m5" ? [""] : [...actor.tenants];
   for (const t of tenants) {
     const r = await doc.send(new GetCommand({ TableName: T.codes(), Key: { pk: codeKey(code, t) } }));
-    const row = r.Item as { tenantId: string; target?: string; targetKind?: string } | undefined;
+    const row = r.Item as { tenantId: string; target?: string; targetKind?: string; family?: string } | undefined;
     if (!row) continue;
     if (!actor.tenants.has(row.tenantId)) break;   // somebody else's: as if unknown
-    if (!row.target) return { status: "blank", code, tenantId: row.tenantId };
+    const family = familyOf(row.family);
+    if (!row.target) return { status: "blank", code, tenantId: row.tenantId, family };
     if (row.targetKind === "article" && code.serial) {
       const u = await unitBySerial(row.tenantId, code.serial, row.target);
-      if (u) return { status: "unit", code, tenantId: row.tenantId, id: u.id, articleId: row.target };
+      if (u) return { status: "unit", code, tenantId: row.tenantId, id: u.id, articleId: row.target, family };
     }
-    return { status: row.targetKind, code, tenantId: row.tenantId, id: row.target };
+    return { status: row.targetKind, code, tenantId: row.tenantId, id: row.target, family };
   }
   if (code.kind !== "m5") {
     const serial = code.serial ?? (code.kind === "qr" && !code.value.startsWith("sha256:") ? code.value : undefined);
@@ -563,8 +569,9 @@ export async function changeUnit(actor: Actor, tenantId: string, unitId: string,
 /* -------------------------------------------------------------- codes ---- */
 
 /** A batch of blank codes of ours, to print; each is bound later, on the bench. */
-export async function mintCodes(actor: Actor, tenantId: string, n: number) {
+export async function mintCodes(actor: Actor, tenantId: string, n: number, fam: Family = "m5") {
   administers(actor, tenantId);
+  const family = familyOf(fam);
   const want = Math.min(Math.max(Math.floor(Number(n)) || 0, 1), 240);
   const out: string[] = [];
   for (let tries = 0; out.length < want && tries < want * 3; tries++) {
@@ -572,14 +579,14 @@ export async function mintCodes(actor: Actor, tenantId: string, n: number) {
     try {
       await doc.send(new PutCommand({
         TableName: T.codes(), ConditionExpression: "attribute_not_exists(pk)",
-        Item: { pk: `m5:${value}`, kind: "m5", value, tenantId, mintedAt: now(), mintedBy: actor.by },
+        Item: { pk: `m5:${value}`, kind: "m5", value, tenantId, mintedAt: now(), mintedBy: actor.by, ...(family === "dhc" ? { family } : {}) },
       }));
       out.push(value);
     } catch (e) {
       if ((e as { name?: string }).name !== "ConditionalCheckFailedException") throw e;
     }
   }
-  return out.map((code) => ({ code, url: labelUrl(code) }));
+  return out.map((code) => ({ code, url: labelUrl(code), family }));
 }
 
 async function target(tenantId: string, kind: string, id: string) {
@@ -1035,6 +1042,269 @@ export async function removeFile(actor: Actor, tenantId: string, boxId: string, 
   await rewrite(tenantId, b, "files", (b.files ?? []).filter((x) => x.id !== fileId), { kind: "file", by: actor.by, note: `removed ${gone.name}` });
   await s3.send(new DeleteObjectCommand({ Bucket: BUCKET(), Key: fileKey(tenantId, boxId, fileId) }));
   return { removed: fileId };
+}
+
+/* ------------------------------------------------------------- intake ---- *
+ * ADR-0022 in maker-5-shared. A person scans the place (a shelf or a box),
+ * then the labels of what goes there, with photos, a note and a count: each
+ * scan is an item, and nothing is in the stock yet. An edge's agent describes
+ * items; a person checks one in, in one transaction. Anyone in the
+ * organisation captures and checks in, as with boxes; an article an item
+ * makes is marked `intake`, so admins see where it came from. Photos are kept
+ * under intake/<tenant>/<item>/ and only pass through signed URLs.
+ */
+
+const photoKey = (tenantId: string, id: string, photoId: string) => `intake/${tenantId}/${id}/${photoId}`;
+const OPEN: Status[] = ["new", "described"];
+
+async function mustIntake(tenantId: string, id: string): Promise<IntakeItem> {
+  const r = await doc.send(new GetCommand({ TableName: T.intake(), Key: { tenantId, id } }));
+  if (!r.Item) throw new Refused("No such item in the intake.");
+  return r.Item as IntakeItem;
+}
+
+async function intakeOf(tenantId: string) {
+  return query<IntakeItem>({
+    TableName: T.intake(), KeyConditionExpression: "tenantId = :t", ExpressionAttributeValues: { ":t": tenantId },
+  }, 2000);
+}
+
+/** A scan at the shelf: the label, the place it goes into, a note and a count. */
+export async function intakeAdd(actor: Actor, tenantId: string, r: Record<string, unknown>) {
+  reads(actor, tenantId);
+  const code = normalise(String(r.code ?? ""));
+  const place = await mustBox(tenantId, String(r.placeId ?? ""));
+  const f = captureFields(r);
+  const row = (await doc.send(new GetCommand({ TableName: T.codes(), Key: { pk: codeKey(code, tenantId) } }))).Item as
+    { tenantId: string; target?: string; targetKind?: string; family?: string } | undefined;
+  if (row && row.tenantId !== tenantId) throw new Refused("That label belongs to another organisation.");
+  if (code.kind === "m5" && !row) throw new Refused("That is no code of this organisation: mint and print it on Materials.");
+  let known: IntakeItem["known"];
+  if (row?.target && row.targetKind) {
+    let name: string | undefined;
+    if (row.targetKind === "article") name = (await getArticleRow(tenantId, row.target))?.name;
+    else if (row.targetKind === "box") name = (await getBoxRow(tenantId, row.target))?.name;
+    else {
+      const u = await getUnitRow(tenantId, row.target);
+      if (u) name = u.name ?? (await getArticleRow(tenantId, u.articleId))?.name;
+    }
+    known = { kind: row.targetKind, id: row.target, ...(name ? { name } : {}) };
+    if (known.kind === "box" && known.id === place.id) throw new Refused("That is the place itself: scan what goes into it.");
+  }
+  // the same label scanned again while its item is open: the one item, at the new place
+  const open = (await intakeOf(tenantId)).find((x) => OPEN.includes(x.status) && x.code.kind === code.kind && x.code.value === code.value);
+  const at = now();
+  if (open) {
+    const item = { ...open, placeId: place.id, placeName: place.name, note: f.note ?? open.note, qty: f.qty ?? open.qty, known, at };
+    await doc.send(new PutCommand({ TableName: T.intake(), Item: item }));
+    return { ...item, again: true };
+  }
+  const item: IntakeItem = {
+    tenantId, id: mintId("i"), code: { kind: code.kind, value: code.value, ...(code.serial ? { serial: code.serial } : {}) } as IntakeItem["code"],
+    family: familyOf(row?.family), placeId: place.id, placeName: place.name, ...f, photos: [], status: "new", at, by: actor.by,
+    ...(known ? { known } : {}),
+  };
+  await doc.send(new PutCommand({ TableName: T.intake(), Item: item, ConditionExpression: "attribute_not_exists(id)" }));
+  return item;
+}
+
+/** The intake, newest first; open items unless a status is asked for. */
+export async function intakeList(actor: Actor, tenantId: string, status = "") {
+  reads(actor, tenantId);
+  const all = await intakeOf(tenantId);
+  const want = status === "all" ? null : status ? [status] : OPEN;
+  return all.filter((x) => !want || want.includes(x.status)).sort((a, b) => b.at.localeCompare(a.at)).slice(0, 300);
+}
+
+/** One item, with short-lived links to its photos. */
+export async function intakeGet(actor: Actor, tenantId: string, id: string) {
+  reads(actor, tenantId);
+  const item = await mustIntake(tenantId, id);
+  const photos = await Promise.all((item.photos ?? []).map(async (p) => ({
+    ...p, url: await getSignedUrl(s3, new GetObjectCommand({ Bucket: BUCKET(), Key: photoKey(tenantId, id, p.id) }), { expiresIn: 600 }),
+  })));
+  const article = articleOf(item, item.suggestion);
+  return { item, photos, article: article ? await getArticleRow(tenantId, article) : null };
+}
+
+/** A short-lived upload link for one photo; intakePhotoDone() records it once it is there. */
+export async function intakePhoto(actor: Actor, tenantId: string, id: string, f: Record<string, unknown>) {
+  reads(actor, tenantId);
+  const item = await mustIntake(tenantId, id);
+  if (!OPEN.includes(item.status)) throw new Refused("This item is closed.");
+  if ((item.photos ?? []).length >= MAX_PHOTOS) throw new Refused(`An item keeps at most ${MAX_PHOTOS} photos.`);
+  const { type, size } = photoFields(f);
+  const photoId = randomBytes(6).toString("hex");
+  const url = await getSignedUrl(s3, new PutObjectCommand({
+    Bucket: BUCKET(), Key: photoKey(tenantId, id, photoId), ContentLength: size, ContentType: type,
+  }), { expiresIn: 900, signableHeaders: new Set(["content-length", "content-type"]) });
+  return { photoId, url, type, size };
+}
+
+export async function intakePhotoDone(actor: Actor, tenantId: string, id: string, photoId: string, type: string) {
+  reads(actor, tenantId);
+  await mustIntake(tenantId, id);
+  if (!/^[0-9a-f]{12}$/.test(photoId)) throw new Refused("No such upload.");
+  let size = 0;
+  try {
+    size = Number((await s3.send(new HeadObjectCommand({ Bucket: BUCKET(), Key: photoKey(tenantId, id, photoId) }))).ContentLength ?? 0);
+  } catch { throw new Refused("The photo has not arrived; take it again."); }
+  const photo = { id: photoId, type: photoFields({ type, size }).type, size };
+  try {
+    await doc.send(new UpdateCommand({
+      TableName: T.intake(), Key: { tenantId, id },
+      UpdateExpression: "SET photos = list_append(if_not_exists(photos, :none), :one)",
+      ConditionExpression: "(attribute_not_exists(photos) OR size(photos) < :max) AND #s IN (:n, :d)",
+      ExpressionAttributeNames: { "#s": "status" },
+      ExpressionAttributeValues: { ":none": [], ":one": [photo], ":max": MAX_PHOTOS, ":n": "new", ":d": "described" },
+    }));
+  } catch (e) {
+    if ((e as { name?: string }).name === "ConditionalCheckFailedException") throw new Refused(`An item keeps at most ${MAX_PHOTOS} photos.`);
+    throw e;
+  }
+  return photo;
+}
+
+/** An edge's agent (or a person) says what an item is; it is only a suggestion until checked in. */
+export async function intakeDescribe(actor: Actor, tenantId: string, id: string, raw: Record<string, unknown>) {
+  reads(actor, tenantId);
+  const item = await mustIntake(tenantId, id);
+  if (!OPEN.includes(item.status)) throw new Refused("This item is closed.");
+  const s = suggestionFields(raw ?? {}, item);
+  if (s.articleId) accepted(await mustArticle(tenantId, s.articleId));
+  try {
+    await doc.send(new UpdateCommand({
+      TableName: T.intake(), Key: { tenantId, id },
+      UpdateExpression: "SET suggestion = :s, #s = :d, describedBy = :by, describedAt = :at",
+      ConditionExpression: "#s IN (:n, :d)", ExpressionAttributeNames: { "#s": "status" },
+      ExpressionAttributeValues: { ":s": JSON.parse(JSON.stringify(s)), ":d": "described", ":n": "new", ":by": actor.by, ":at": now() },
+    }));
+  } catch (e) {
+    if ((e as { name?: string }).name === "ConditionalCheckFailedException") throw new Refused("This item is closed.");
+    throw e;
+  }
+  return { id, suggestion: s };
+}
+
+/** Not to be checked in: a wrong scan, a part thrown away. Its photos go. */
+export async function intakeDrop(actor: Actor, tenantId: string, id: string) {
+  reads(actor, tenantId);
+  const item = await mustIntake(tenantId, id);
+  if (!OPEN.includes(item.status)) throw new Refused("This item is closed.");
+  await doc.send(new UpdateCommand({
+    TableName: T.intake(), Key: { tenantId, id }, UpdateExpression: "SET #s = :x, droppedBy = :by, droppedAt = :at, photos = :none",
+    ConditionExpression: "#s IN (:n, :d)", ExpressionAttributeNames: { "#s": "status" },
+    ExpressionAttributeValues: { ":x": "dropped", ":by": actor.by, ":at": now(), ":none": [], ":n": "new", ":d": "described" },
+  }));
+  for (const p of item.photos ?? []) await s3.send(new DeleteObjectCommand({ Bucket: BUCKET(), Key: photoKey(tenantId, id, p.id) }));
+  return { dropped: id };
+}
+
+/**
+ * Check an item in, as it is described (or with the person's changes): in one
+ * transaction the article is found or made, the stock received, the unit or
+ * the new box made in the place, or the parts counted into it, the code bound
+ * and the item closed. A label known already moves its unit or box instead.
+ */
+export async function intakeCheckIn(actor: Actor, tenantId: string, id: string, edits?: Record<string, unknown>) {
+  reads(actor, tenantId);
+  const item = await mustIntake(tenantId, id);
+  const s: Suggestion | undefined = edits ? suggestionFields(edits, item) : item.suggestion;
+  const articleId = articleOf(item, s);
+  const existing = articleId ? await mustArticle(tenantId, articleId) : undefined;
+  const p = plan(item, s, existing);
+  const place = await mustBox(tenantId, item.placeId!);
+  const at = now();
+  const close = (done: IntakeItem["done"]) => ({ Update: {
+    TableName: T.intake(), Key: { tenantId, id },
+    UpdateExpression: "SET #s = :c, done = :done" + (s ? ", suggestion = :sg" : ""),
+    ConditionExpression: "#s IN (:n, :d)", ExpressionAttributeNames: { "#s": "status" },
+    ExpressionAttributeValues: { ":c": "checked-in", ":done": done, ":n": "new", ":d": "described", ...(s ? { ":sg": JSON.parse(JSON.stringify(s)) } : {}) },
+  } });
+
+  if (p.what === "move" && p.move) {
+    if (p.move.kind === "unit") await checkIn(actor, tenantId, place.id, { unitId: p.move.id, note: item.note });
+    else await moveBox(actor, tenantId, p.move.id, { parentId: place.id });
+    const u = p.move.kind === "unit" ? await getUnitRow(tenantId, p.move.id) : null;
+    const done = { kind: p.move.kind, id: p.move.id, articleId: u?.articleId ?? "", at, by: actor.by };
+    await transact([close(done)], "This item was checked in meanwhile.");
+    return { item: id, ...done, place: place.id };
+  }
+
+  const q = p.qty;
+  const bulk = p.what !== "device";
+  const tx: unknown[] = [];
+  let aid: string;
+  if (existing) {
+    aid = existing.id;
+    tx.push({ Update: {
+      TableName: T.articles(), Key: { tenantId, id: aid },
+      UpdateExpression: "SET updatedAt = :at ADD onHand :q, #f :q" + (bulk ? ", boxed :q" : ""),
+      ConditionExpression: "attribute_exists(id) AND attribute_not_exists(proposed)",
+      ExpressionAttributeNames: { "#f": "free" }, ExpressionAttributeValues: { ":at": at, ":q": q },
+    } });
+  } else {
+    aid = mintId("a");
+    tx.push({ Put: {
+      TableName: T.articles(), ConditionExpression: "attribute_not_exists(id)",
+      Item: JSON.parse(JSON.stringify({ ...s!.article, tenantId, id: aid, onHand: q, free: q, reserved: 0, ...(bulk ? { boxed: q } : {}),
+        intake: { by: actor.by, at }, createdAt: at, updatedAt: at, createdBy: actor.by })),
+    } });
+  }
+  const log = (m: Record<string, unknown>) => movement({ tenantId, articleId: aid, spaceId: place.spaceId, by: actor.by, note: item.note, ...m });
+  let done: NonNullable<IntakeItem["done"]>;
+  if (p.what === "device") {
+    const uid = mintId("u");
+    tx.push({ Put: { TableName: T.units(), ConditionExpression: "attribute_not_exists(id)", Item: JSON.parse(JSON.stringify({
+      tenantId, id: uid, articleId: aid, state: "in-stock", serial: p.serial ?? (item.code as { serial?: string }).serial,
+      boxId: place.id, createdAt: at })) } });
+    tx.push(log({ kind: "receive", unitId: uid, qty: 1 }), log({ kind: "boxin", unitId: uid, boxId: place.id, qty: 1 }));
+    done = { kind: "unit", id: uid, articleId: aid, at, by: actor.by };
+  } else if (p.what === "box") {
+    if ((await boxPath(tenantId, place)).length + 1 >= MAX_BOX_DEPTH) throw new Refused(`Boxes nest at most ${MAX_BOX_DEPTH} deep.`);
+    const xid = mintId("x");
+    tx.push({ Put: { TableName: T.boxes(), ConditionExpression: "attribute_not_exists(id)", Item: JSON.parse(JSON.stringify({
+      tenantId, id: xid, name: p.boxName ?? "Parts", kind: p.boxKind ?? "box", parentId: place.id, spaceId: place.spaceId,
+      links: [], files: [], createdAt: at, updatedAt: at, createdBy: actor.by })) } });
+    tx.push({ Update: {
+      TableName: T.boxStock(), Key: { boxId: xid, articleId: aid },
+      UpdateExpression: "SET tenantId = :t, updatedAt = :at ADD qty :q", ExpressionAttributeValues: { ":t": tenantId, ":at": at, ":q": q },
+    } });
+    tx.push(log({ kind: "receive", qty: q }), log({ kind: "box", boxId: xid, qty: 0, articleId: undefined, note: "new" }),
+      log({ kind: "boxin", boxId: xid, qty: q }));
+    done = { kind: "box", id: xid, articleId: aid, at, by: actor.by };
+  } else {
+    tx.push({ Update: {
+      TableName: T.boxStock(), Key: { boxId: place.id, articleId: aid },
+      UpdateExpression: "SET tenantId = :t, updatedAt = :at ADD qty :q", ExpressionAttributeValues: { ":t": tenantId, ":at": at, ":q": q },
+    } });
+    tx.push(log({ kind: "receive", qty: q }), log({ kind: "boxin", boxId: place.id, qty: q }));
+    done = { kind: "article", id: aid, articleId: aid, at, by: actor.by };
+  }
+  if (p.bind !== "none") {
+    const target = p.bind === "article" ? aid : done.id;
+    const code = item.code as Code;
+    const pk = codeKey(code, tenantId);
+    if (code.kind === "m5") {
+      tx.push({ Update: {
+        TableName: T.codes(), Key: { pk },
+        UpdateExpression: "SET #tg = :id, targetKind = :k, boundBy = :by, boundAt = :at",
+        ConditionExpression: "attribute_exists(pk) AND tenantId = :t AND attribute_not_exists(#tg)",
+        ExpressionAttributeNames: { "#tg": "target" },
+        ExpressionAttributeValues: { ":id": target, ":k": p.bind, ":by": actor.by, ":at": at, ":t": tenantId },
+      } });
+    } else {
+      const had = (await doc.send(new GetCommand({ TableName: T.codes(), Key: { pk } }))).Item as { target?: string } | undefined;
+      if (had && had.target !== target) throw new Refused("That code points at something else in this organisation already.");
+      if (!had) {
+        tx.push({ Put: { TableName: T.codes(), ConditionExpression: "attribute_not_exists(pk)",
+          Item: { pk, kind: code.kind, value: code.value, tenantId, target, targetKind: p.bind, boundBy: actor.by, boundAt: at } } });
+      }
+    }
+  }
+  tx.push(close(done));
+  await transact(tx, "Someone changed this meanwhile, or the label was bound already; look again.");
+  return { item: id, ...done, place: place.id };
 }
 
 /* ------------------------------------------------------------ helpers ---- */

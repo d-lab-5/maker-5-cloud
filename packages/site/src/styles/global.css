@@ -1146,6 +1146,12 @@ a {
 .mk-take { margin-top: 1rem; border-top: 1px solid var(--mk-border); padding-top: 0.5rem; }
 .mk-scanner { display: grid; gap: 0.5rem; margin: 0.75rem 0; }
 .mk-scanner__video { width: 100%; max-width: 28rem; border-radius: 10px; background: #000; }
+/* the intake (ADR-0022): place, then label after label */
+.mk-intake__place { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: baseline; margin-bottom: 0.5rem; }
+.mk-intake__item { display: grid; gap: 0.5rem; }
+.mk-intake__photo { cursor: pointer; text-align: center; }
+.mk-intake__done { margin-top: 1rem; border-top: 1px solid var(--mk-border); padding-top: 0.5rem; }
+.mk-intake__done li { display: flex; justify-content: space-between; gap: 0.5rem; }
 .mk-card .mk-facts { margin: 0.75rem 0; }
 .mk-card h1 { margin: 0.2rem 0 0.4rem; }
 .mk-card .mk-chip { margin: 0 0.3rem 0.3rem 0; text-decoration: none; }

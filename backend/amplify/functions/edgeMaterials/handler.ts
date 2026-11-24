@@ -3,13 +3,19 @@
 // reserves, releases and returns parts for that workspace's products. It
 // never edits the catalogue, receives stock or mints codes: a person does,
 // on the site. Every step is logged as edge:<id>.
+//
+// The intake (ADR-0022) is the exception, for the person at the edge: its
+// agent describes what was scanned at the shelf, and the person checks an
+// item in from the edge's page (the agent cannot: that call is not in the
+// chat's allowed list). Checking in makes the article and its stock, as it
+// would on the phone.
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda";
 import { extractBearer, json, parseJsonBody, versionGate } from "../edge-shared/http";
 import { verifyDeviceToken } from "../edge-shared/registry";
 import * as st from "../materials-shared/store";
 
 type Body = { q?: string; category?: string; id?: string; code?: string; spaceId?: string; articleId?: string;
-  qty?: number; unitId?: string; note?: string; articles?: unknown };
+  qty?: number; unitId?: string; note?: string; articles?: unknown; status?: string; suggestion?: Record<string, unknown> };
 
 export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> => {
   const tooOld = versionGate(event);
@@ -45,6 +51,11 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
       }
       // a BOM import proposes the articles it needs; an admin accepts them (ADR-0014)
       case "propose": return json(200, await st.proposeArticles(actor, tenant, b.articles));
+      case "intake/list": return json(200, { items: await st.intakeList(actor, tenant, String(b.status ?? "")) });
+      case "intake/get": return json(200, await st.intakeGet(actor, tenant, String(b.id ?? "")));
+      case "intake/describe": return json(200, await st.intakeDescribe(actor, tenant, String(b.id ?? ""), b.suggestion ?? {}));
+      case "intake/checkin": return json(200, await st.intakeCheckIn(actor, tenant, String(b.id ?? ""), b.suggestion));
+      case "intake/drop": return json(200, await st.intakeDrop(actor, tenant, String(b.id ?? "")));
       case "reserve": case "release": case "return":
         return json(200, await st.step(actor, route, String(b.spaceId ?? ""), String(b.articleId ?? ""), b));
       default: return json(404, { error: "not_found" });

@@ -12,6 +12,8 @@
 //   delete a box                          the organisation's admins, with two-step sign-in
 //   boxes: make, move, check in and out,
 //   links and files                       anyone in the organisation
+//   the intake: capture, describe,
+//   check in (ADR-0022)                   anyone in the organisation
 
 import type { AppSyncIdentityCognito, AppSyncResolverEvent } from "aws-lambda";
 import { claimsOf, tenantsOf } from "../shared/claims";
@@ -63,7 +65,7 @@ export const handler = async (event: AppSyncResolverEvent<Args>) => {
       // units
       case "changeUnit": return await st.changeUnit(actor, t, String(a.unitId), a);
       // codes
-      case "mintCodes": return await st.mintCodes(actor, t, Number(a.n));
+      case "mintCodes": return await st.mintCodes(actor, t, Number(a.n), a.family === "dhc" ? "dhc" : "m5");
       case "bindCode": return await st.bindCode(actor, t, String(a.code), String(a.kind), String(a.id));
       case "unbindCode": return await st.unbindCode(actor, t, String(a.code));
       // boxes (ADR-0011): anyone in the organisation; deleting one is an admin's
@@ -73,6 +75,15 @@ export const handler = async (event: AppSyncResolverEvent<Args>) => {
       case "moveBox": return await st.moveBox(actor, t, String(a.id), a);
       case "deleteBox": return await st.deleteBox(actor, t, String(a.id));
       case "checkIn": return await st.checkIn(actor, t, String(a.boxId), a);
+      // the intake (ADR-0022): scanned at the shelf, described, checked in; anyone in the organisation
+      case "intake": return await st.intakeList(actor, t, String(a.status ?? ""));
+      case "intakeGet": return await st.intakeGet(actor, t, String(a.id));
+      case "intakeAdd": return await st.intakeAdd(actor, t, a);
+      case "intakePhoto": return await st.intakePhoto(actor, t, String(a.id), a);
+      case "intakePhotoDone": return await st.intakePhotoDone(actor, t, String(a.id), String(a.photoId), String(a.type));
+      case "intakeDescribe": return await st.intakeDescribe(actor, t, String(a.id), a.suggestion ?? {});
+      case "intakeDrop": return await st.intakeDrop(actor, t, String(a.id));
+      case "intakeCheckIn": return await st.intakeCheckIn(actor, t, String(a.id), a.suggestion);
       case "checkOut": return await st.checkOut(actor, t, String(a.boxId), a);
       case "addLink": return await st.addLink(actor, t, String(a.boxId), a.link ?? {});
       case "removeLink": return await st.removeLink(actor, t, String(a.boxId), String(a.linkId));

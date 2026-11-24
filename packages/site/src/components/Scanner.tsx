@@ -31,13 +31,15 @@ declare global {
 
 export const hasNfc = () => typeof window !== "undefined" && "NDEFReader" in window;
 
-export function CameraScanner({ onFound }: { onFound: Found }) {
+export function CameraScanner({ onFound, auto = false }: { onFound: Found; auto?: boolean }) {
   const { t } = useT();
   const video = React.useRef<HTMLVideoElement>(null);
   const [state, setState] = React.useState<"idle" | "on" | "error">("idle");
   const [error, setError] = React.useState("");
   const stop = React.useRef<() => void>(() => undefined);
   React.useEffect(() => () => stop.current(), []);
+  // auto: the camera is on as soon as it is shown (the intake's scan after scan)
+  React.useEffect(() => { if (auto) void start(); }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const start = async () => {
     setError("");

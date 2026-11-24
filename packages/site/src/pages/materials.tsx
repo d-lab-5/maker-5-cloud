@@ -45,6 +45,7 @@ const MaterialsPage: React.FC<PageProps> = () => {
   const [adding, setAdding] = React.useState(false);
   const [labels, setLabels] = React.useState<{ items: LabelItem[]; layout: Layout } | null>(null);
   const [blank, setBlank] = React.useState(24);
+  const [blankFamily, setBlankFamily] = React.useState<m.Family>("m5");
   const [error, setError] = React.useState<string | null>(null);
   const [queueOpen, setQueueOpen] = React.useState(false);
   const [tab, setTab] = React.useState<"stock" | "boxes">(params().get("tab") === "boxes" ? "boxes" : "stock");
@@ -72,8 +73,8 @@ const MaterialsPage: React.FC<PageProps> = () => {
   const mintBlank = async () => {
     setError(null);
     try {
-      const got = await m.mintCodes(w, blank);
-      setLabels({ items: got.map((c) => ({ code: c.code })), layout: "tiny" });
+      const got = await m.mintCodes(w, blank, blankFamily);
+      setLabels({ items: got.map((c) => ({ code: c.code, family: c.family })), layout: blankFamily === "dhc" ? "tag" : "tiny" });
     } catch (e) { setError(message(e)); }
   };
 
@@ -166,6 +167,10 @@ const MaterialsPage: React.FC<PageProps> = () => {
               <form className="mk-toolbar" onSubmit={(e) => { e.preventDefault(); void mintBlank(); }}>
                 <input className="mk-input mk-input--num" type="number" min={1} max={240} value={blank}
                   onChange={(e) => setBlank(Number(e.target.value))} aria-label={t("mt.blank.n")} />
+                <select className="mk-select" value={blankFamily} onChange={(e) => setBlankFamily(e.target.value as m.Family)} aria-label={t("mt.blank.family")}>
+                  <option value="m5">{t("mt.blank.m5")}</option>
+                  <option value="dhc">{t("mt.blank.dhc")}</option>
+                </select>
                 <button type="submit" className="mk-button mk-button--ghost">{t("mt.blank.make")}</button>
               </form>
             </div>

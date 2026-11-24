@@ -49,7 +49,7 @@ export interface StockWorkspace { id: string; name: string; admin: boolean }
 export interface ReadCode { kind: string; value: string; serial?: string; batch?: string }
 export type Resolved =
   | { status: "article" | "unit" | "box"; code: ReadCode; tenantId: string; id: string; articleId?: string; bySerial?: boolean }
-  | { status: "blank"; code: ReadCode; tenantId: string }
+  | { status: "blank"; code: ReadCode; tenantId: string; family?: Family }
   | { status: "unknown"; code: ReadCode };
 
 const Q = `query Materials($op: String!, $args: AWSJSON) { materials(op: $op, args: $args) }`;
@@ -93,7 +93,11 @@ export const step = (s: Step, spaceId: string, articleId: string, r: { qty?: num
 export const changeUnit = (tenantId: string, unitId: string,
   ch: { location?: string; parentId?: string | null; firmware?: { name: string; version: string }; retire?: boolean; note?: string }) =>
   change("changeUnit", { tenantId, unitId, ...ch });
-export const mintCodes = (tenantId: string, n: number) => change<Array<{ code: string; url: string }>>("mintCodes", { tenantId, n });
+/** m5, the maker's parts, or dhc, devices a smart home can use (ADR-0022); printed as the label's mark. */
+export type Family = "m5" | "dhc";
+export const markOf = (f?: Family) => (f === "dhc" ? "DHC" : "M5");
+export const mintCodes = (tenantId: string, n: number, family: Family = "m5") =>
+  change<Array<{ code: string; url: string; family: Family }>>("mintCodes", { tenantId, n, family });
 export const bindCode = (tenantId: string, code: string, kind: "article" | "unit" | "box", id: string) => change("bindCode", { tenantId, code, kind, id });
 
 export const boxes = (tenantId: string, q = "", spaceId = "") => read<Box[]>("boxes", { tenantId, q, spaceId });
@@ -122,6 +126,42 @@ export async function uploadFile(tenantId: string, boxId: string, file: File, ki
   return change<BoxFile>("fileUploaded", { tenantId, boxId, fileId: got.fileId, name: file.name, type, kind });
 }
 export const unbindCode = (tenantId: string, code: string) => change("unbindCode", { tenantId, code });
+
+/* -- the intake (ADR-0022): scanned at the shelf, described at the edge, checked in -- */
+
+export type IntakeStatus = "new" | "described" | "checked-in" | "dropped";
+export interface IntakeItem {
+  tenantId: string; id: string; code: { kind: string; value: string }; family: Family;
+  placeId?: string; placeName?: string; note?: string; qty?: number;
+  photos: Array<{ id: string; type: string; size: number }>;
+  status: IntakeStatus; at: string; by: string;
+  known?: { kind: string; id: string; name?: string };
+  suggestion?: { what: "device" | "box" | "bulk"; articleId?: string; article?: Partial<Article>; serial?: string; qty?: number; boxName?: string };
+  again?: boolean;
+}
+export const intake = (tenantId: string, status = "") => read<IntakeItem[]>("intake", { tenantId, status });
+export const intakeAdd = (tenantId: string, r: { code: string; placeId: string; note?: string; qty?: number }) =>
+  change<IntakeItem>("intakeAdd", { tenantId, ...r });
+export const intakeDrop = (tenantId: string, id: string) => change("intakeDrop", { tenantId, id });
+
+/** A photo for an item, shrunk in the browser to 1600 px at most, as JPEG, then sent straight to storage. */
+export async function intakePhoto(tenantId: string, id: string, file: File) {
+  const blob = await shrink(file, 1600);
+  const got = await change<{ photoId: string; url: string }>("intakePhoto", { tenantId, id, type: "image/jpeg", size: blob.size });
+  const put = await fetch(got.url, { method: "PUT", body: blob, headers: { "content-type": "image/jpeg" } });
+  if (!put.ok) throw new Error(`The upload failed (${put.status}).`);
+  return change("intakePhotoDone", { tenantId, id, photoId: got.photoId, type: "image/jpeg" });
+}
+
+async function shrink(file: File, max: number): Promise<Blob> {
+  const img = await createImageBitmap(file);
+  const k = Math.min(1, max / Math.max(img.width, img.height));
+  const c = document.createElement("canvas");
+  c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+  c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
+  img.close();
+  return new Promise((ok, no) => c.toBlob((b) => (b ? ok(b) : no(new Error("The photo could not be read."))), "image/jpeg", 0.82));
+}
 
 /**
  * The URL a label's QR and an NFC tag carry (ADR-0009): this site's own host,

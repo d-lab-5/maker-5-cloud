@@ -12,7 +12,7 @@ import { CATEGORY_LIST } from "./categories.generated";
 export class Refused extends Error {}
 
 const ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz";
-export const mintId = (prefix: "a" | "u" | "x") =>
+export const mintId = (prefix: "a" | "u" | "x" | "i") =>
   `${prefix}-${Array.from({ length: 10 }, () => ALPHABET[randomInt(ALPHABET.length)]).join("")}`;
 export const ARTICLE = /^a-[23456789abcdefghjkmnpqrstuvwxyz]{10}$/;
 export const UNIT = /^u-[23456789abcdefghjkmnpqrstuvwxyz]{10}$/;
@@ -62,6 +62,10 @@ export interface Article {
   /** Proposed by an edge (a BOM import, ADR-0014) and not yet accepted by an
    *  admin: it has no stock, and nothing may be received or taken for it. */
   proposed?: { by: string; at: string };
+  /** dhc: a device a smart home can use; m5 (the default) otherwise (ADR-0022). */
+  family?: "dhc";
+  /** Made by checking in an item of the intake (ADR-0022): who and when. */
+  intake?: { by: string; at: string };
 }
 export interface Unit {
   tenantId: string; id: string; articleId: string; serial?: string; state: (typeof UNIT_STATES)[number];
@@ -105,6 +109,8 @@ export function articleFields(a: Record<string, unknown>, existing?: Article) {
     mpn: text(a.mpn ?? existing?.mpn, 80),
     location: text(a.location ?? existing?.location, 80),
     note: text(a.note ?? existing?.note, 500),
+    // m5, the maker's parts, or dhc, a smart-home device (ADR-0022); m5 when not said
+    family: (a.family ?? existing?.family) === "dhc" ? "dhc" as const : undefined,
   };
 }
 
