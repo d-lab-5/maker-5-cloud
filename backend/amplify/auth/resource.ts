@@ -37,7 +37,7 @@ export const auth = defineAuth({
           `An account has been created for you.\n\n` +
           `Username: ${user()}\n` +
           `Temporary password: ${code()}\n\n` +
-          `Sign in at https://maker-5.cloud/ — you will be asked to ` +
+          `Sign in at https://maker5.cloud/ — you will be asked to ` +
           `choose a new password.`,
       },
     },
