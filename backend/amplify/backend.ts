@@ -316,10 +316,12 @@ const boxStockTable = stockTable("MkBoxStock", "boxId", "articleId");
 gsi(boxStockTable, "byArticle", "articleId", "boxId");
 // The intake (ADR-0022): what was scanned at the shelf, until it is checked in.
 const intakeTable = stockTable("MkIntake", "tenantId", "id");
+// Orders (ADR-0023): what was bought, expected until the intake checks it in.
+const ordersTable = stockTable("MkOrderLines", "tenantId", "id");
 
 const stockTables = {
   ARTICLES: articlesTable, UNITS: unitsTable, ALLOCATIONS: allocationsTable, MOVEMENTS: movementsTable, CODES: codesTable,
-  BOXES: boxesTable, BOXSTOCK: boxStockTable, INTAKE: intakeTable,
+  BOXES: boxesTable, BOXSTOCK: boxStockTable, INTAKE: intakeTable, ORDERS: ordersTable,
 };
 const withIndexes = (t: Table) => [t.tableArn, `${t.tableArn}/index/*`];
 for (const f of [backend.materials, backend.edgeMaterials]) {
@@ -350,7 +352,7 @@ allow(backend.edgeMaterials.resources.lambda, ["dynamodb:UpdateItem", "dynamodb:
 // also makes boxes and box lines, binds the scanned code and closes the item;
 // it reads the photos (signed links) and deletes them when an item is dropped.
 allow(backend.edgeMaterials.resources.lambda, ["dynamodb:UpdateItem", "dynamodb:PutItem", "dynamodb:ConditionCheckItem"],
-  [intakeTable.tableArn, boxesTable.tableArn, boxStockTable.tableArn, codesTable.tableArn]);
+  [intakeTable.tableArn, boxesTable.tableArn, boxStockTable.tableArn, codesTable.tableArn, ordersTable.tableArn]);
 allow(backend.edgeMaterials.resources.lambda, ["s3:GetObject", "s3:DeleteObject"], [`${bucket.bucketArn}/intake/*`]);
 backend.edgeMaterials.addEnvironment("OBJECT_BUCKET_NAME", bucket.bucketName);
 // checking in the intake is an admin's: the edge asks whether the person who

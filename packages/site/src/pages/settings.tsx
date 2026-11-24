@@ -63,6 +63,7 @@ function MfaPanel() {
   const session = useSession();
   const { t } = useT();
   const [setting, setSetting] = React.useState(false);
+  const [replaced, setReplaced] = React.useState(false);
   return (
     <div className="mk-panel" style={{ marginTop: "1rem" }}>
       <h2 className="mk-panel__title">{t("mfa.title")}</h2>
@@ -71,6 +72,19 @@ function MfaPanel() {
         <button type="button" className="mk-button" onClick={() => setSetting(true)}>{t("mfa.start")}</button>
       )}
       {!session.mfa && setting && <MfaSetup email={session.email} onDone={() => void refreshGroups()} />}
+      {session.mfa && !setting && (
+        <>
+          {replaced && <p className="mk-ok" role="status">{t("mfa.replaced")}</p>}
+          <button type="button" className="mk-button mk-button--ghost" onClick={() => { setReplaced(false); setSetting(true); }}>{t("mfa.again")}</button>
+        </>
+      )}
+      {session.mfa && setting && (
+        <>
+          <p className="mk-panel__hint">{t("mfa.againHint")}</p>
+          <MfaSetup again email={session.email} onDone={() => { setSetting(false); setReplaced(true); }} />
+          <button type="button" className="mk-button mk-button--ghost" onClick={() => setSetting(false)}>{t("mt.cancel")}</button>
+        </>
+      )}
     </div>
   );
 }

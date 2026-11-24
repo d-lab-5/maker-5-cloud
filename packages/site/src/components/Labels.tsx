@@ -15,6 +15,8 @@ import { clearQueue, dequeue, enqueue, setUsedTop, usedTop, useQueue, type Queue
  *   box       63.5 × 38.1 mm (the common address label, 21 a sheet): a
  *             30 mm QR, read from a shelf 30 to 40 cm away, the box's name
  *             in bold, its code and workspace; for a carton, a bag, a drawer
+ *   smallbox  38.1 × 21.2 mm (65 a sheet): a 17 mm QR, the name and code; for
+ *             a small parts box, read from 20 to 30 cm
  *
  * Every label prints its code as "M5 K7Q2M9", or "DHC K7Q2M9" for a code
  * minted for smart-home devices (ADR-0022): the mark tells which inventory a
@@ -32,13 +34,14 @@ import { clearQueue, dequeue, enqueue, setUsedTop, usedTop, useQueue, type Queue
  */
 
 export interface LabelItem { code: string; title?: string; sub?: string; family?: Family }
-export type Layout = "tiny" | "tag" | "article" | "box";
+export type Layout = "tiny" | "tag" | "article" | "box" | "smallbox";
 
 const SIZE: Record<Layout, { qr: number; ecc: "L" | "M" }> = {
   tiny: { qr: 10, ecc: "L" },
   tag: { qr: 20, ecc: "M" },
   article: { qr: 25, ecc: "M" },
   box: { qr: 30, ecc: "M" },
+  smallbox: { qr: 17, ecc: "M" },
 };
 
 /** One label's content; its size and layout come from the class around it. */
@@ -86,6 +89,7 @@ export function LabelSheet({ items, layout, onClose, tenantId }: {
           <option value="tag">{t("lb.tag")}</option>
           <option value="article">{t("lb.article")}</option>
           <option value="box">{t("lb.box")}</option>
+          <option value="smallbox">{t("lb.smallbox")}</option>
         </select>
         <label className="mk-muted">{t("lb.skip")}{" "}
           <input className="mk-input mk-input--num" type="number" min={0} max={200} value={skip}
@@ -122,7 +126,7 @@ export function QueueSheet({ tenantId, onClose }: { tenantId: string; onClose: (
     clearQueue(tenantId);
     onClose();
   };
-  const counts = (["box", "article", "tag", "tiny"] as const)
+  const counts = (["box", "article", "smallbox", "tag", "tiny"] as const)
     .map((s) => [s, queue.filter((x) => x.size === s).length] as const).filter(([, n]) => n);
   return (
     <div className="mk-labels" role="dialog" aria-label={t("lq.title")}>

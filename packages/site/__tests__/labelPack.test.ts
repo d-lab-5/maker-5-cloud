@@ -44,3 +44,9 @@ test("a part-used sheet starts below what is gone, and the next sheets start at 
 test("nothing to print is no sheet", () => {
   assert.deepEqual(pack([]).sheets, []);
 });
+
+test("small box labels pack 65 to a plain sheet's rows", () => {
+  const got = pack(Array.from({ length: 10 }, (_, i) => ({ item: i, size: "smallbox" as const })));
+  assert.equal(got.sheets.length, 1);
+  assert.ok(got.sheets[0].every((p) => p.w === 38.1 && p.h === 21.2));
+});

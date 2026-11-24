@@ -21,8 +21,8 @@ import { totpIssuer } from "../lib/totp";
 const grouped = (secret: string) => secret.replace(/(.{4})/g, "$1 ").trim();
 
 /** QR, key and the code field: shared by the sign-in step and the setup panel. */
-export function TotpEnroll({ uri, secret, busy, error, onCode }: {
-  uri: string; secret: string; busy: boolean; error: string | null; onCode: (code: string) => void;
+export function TotpEnroll({ uri, secret, busy, error, onCode, action }: {
+  uri: string; secret: string; busy: boolean; error: string | null; onCode: (code: string) => void; action?: string;
 }) {
   const { t } = useT();
   const [code, setCode] = React.useState("");
@@ -37,13 +37,19 @@ export function TotpEnroll({ uri, secret, busy, error, onCode }: {
           onChange={(e) => setCode(e.target.value)} required />
       </label>
       {error && <p className="mk-gate__error" role="alert">{error}</p>}
-      <button className="mk-button" type="submit" disabled={busy}>{busy ? "…" : t("mfa.enable")}</button>
+      <button className="mk-button" type="submit" disabled={busy}>{busy ? "…" : action ?? t("mfa.enable")}</button>
     </form>
   );
 }
 
-/** Turn TOTP on for the signed-in account, then call onDone. */
-export function MfaSetup({ email, onDone }: { email?: string; onDone: () => void }) {
+/**
+ * Turn TOTP on for the signed-in account, then call onDone. With `again`, a
+ * new authenticator entry replaces the old one (under today's name, as
+ * lib/totp.ts makes it): the old entry's codes stop working once the new
+ * one's first code is confirmed.
+ */
+export function MfaSetup({ email, onDone, again }: { email?: string; onDone: () => void; again?: boolean }) {
+  const { t } = useT();
   const [setup, setSetup] = React.useState<{ uri: string; secret: string } | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -65,5 +71,5 @@ export function MfaSetup({ email, onDone }: { email?: string; onDone: () => void
   };
 
   if (!setup) return error ? <p className="mk-gate__error" role="alert">{error}</p> : <p className="mk-muted">…</p>;
-  return <TotpEnroll uri={setup.uri} secret={setup.secret} busy={busy} error={error} onCode={confirm} />;
+  return <TotpEnroll uri={setup.uri} secret={setup.secret} busy={busy} error={error} onCode={confirm} action={again ? t("mfa.replace") : undefined} />;
 }

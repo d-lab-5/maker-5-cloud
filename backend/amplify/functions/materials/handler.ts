@@ -73,6 +73,10 @@ export const handler = async (event: AppSyncResolverEvent<Args>) => {
       case "boxes": return await st.listBoxes(actor, t, String(a.q ?? ""), String(a.spaceId ?? ""));
       case "box": return await st.box(actor, t, String(a.id));
       case "saveBox": return await st.saveBox(actor, t, a.box ?? {});
+      // orders (ADR-0023): expected until the intake checks them in; anyone in the organisation
+      case "orders": return await st.ordersList(actor, t, a.status === undefined ? "open" : String(a.status));
+      case "ordersAdd": return await st.ordersAdd(actor, t, a);
+      case "orderDrop": return await st.orderDrop(actor, t, String(a.id));
       case "makeBoxes": return await st.makeBoxes(actor, t, a);
       case "moveBox": return await st.moveBox(actor, t, String(a.id), a);
       case "deleteBox": return await st.deleteBox(actor, t, String(a.id));

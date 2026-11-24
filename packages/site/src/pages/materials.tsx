@@ -2,6 +2,7 @@ import * as React from "react";
 import type { HeadFC, PageProps } from "gatsby";
 import { Shell } from "../components/Shell";
 import { LabelSheet, QueueSheet, type LabelItem, type Layout } from "../components/Labels";
+import { nextNumber } from "../lib/boxNames";
 import { useQueue } from "../lib/labelQueue";
 import { History } from "../components/History";
 import * as m from "../lib/materials";
@@ -103,7 +104,7 @@ const MaterialsPage: React.FC<PageProps> = () => {
         </nav>
       )}
       {w && tab === "intake" && <IntakeInbox key={w} tenantId={w} admin={admin} />}
-      {w && tab === "boxes" && <BoxesPanel tenantId={w} admin={admin} onLabels={(items) => setLabels({ items, layout: "box" })} />}
+      {w && tab === "boxes" && <BoxesPanel tenantId={w} admin={admin} onLabels={(items, layout = "box") => setLabels({ items, layout })} />}
       {w && tab === "stock" && (
         <div className="mk-noprint">
           <div className="mk-panel">
@@ -197,7 +198,7 @@ function QueueButton({ tenantId, onOpen }: { tenantId: string; onOpen: () => voi
   return <button type="button" className="mk-button mk-button--ghost" onClick={onOpen}>{t("lq.open", { n })}</button>;
 }
 
-function BoxesPanel({ tenantId, admin, onLabels }: { tenantId: string; admin: boolean; onLabels: (items: LabelItem[]) => void }) {
+function BoxesPanel({ tenantId, admin, onLabels }: { tenantId: string; admin: boolean; onLabels: (items: LabelItem[], layout?: Layout) => void }) {
   const { t } = useT();
   const [list, setList] = React.useState<m.Box[] | null>(null);
   const [spaces, setSpaces] = React.useState<Space[]>([]);
@@ -240,10 +241,11 @@ function BoxesPanel({ tenantId, admin, onLabels }: { tenantId: string; admin: bo
           {admin && <button type="button" className="mk-button mk-button--ghost" onClick={() => setBatch(!batch)}>{t("bx.batch")}</button>}
           {admin && <button type="button" className="mk-button mk-button--ghost" disabled={!picked.size} onClick={() => void print()}>{t("bx.labels", { n: picked.size })}</button>}
         </div>
-        {adding && <EditBox tenantId={tenantId} spaces={spaces} run={run}
+        {adding && <EditBox tenantId={tenantId} spaces={spaces} run={run} onCancel={() => setAdding(false)}
           onSaved={(b) => { setAdding(false); window.location.assign(m.boxHref(tenantId, b.id)); }} />}
         {batch && <BatchBoxes tenantId={tenantId} boxes={list ?? []} run={run}
-          onMade={(made, parent) => { setBatch(false); load(); onLabels(made.map((b) => ({ code: b.code, title: b.name, sub: parent ?? "" }))); }} />}
+          onCancel={() => setBatch(false)}
+          onMade={(made, parent, layout) => { setBatch(false); load(); onLabels(made.map((b) => ({ code: b.code, title: b.name, sub: parent ?? "" })), layout); }} />}
         {error && <p className="mk-error" role="alert">{error}</p>}
         <table className="mk-table">
           <thead><tr>
@@ -274,9 +276,9 @@ function BoxesPanel({ tenantId, admin, onLabels }: { tenantId: string; admin: bo
  * by default) or named one a line (a wall cabinet, a workbench). Each gets
  * its code now; what is in it and where it sits come later, by scanning.
  */
-function BatchBoxes({ tenantId, boxes, run, onMade }: {
+function BatchBoxes({ tenantId, boxes, run, onMade, onCancel }: {
   tenantId: string; boxes: m.Box[]; run: (fn: () => Promise<unknown>) => Promise<boolean>;
-  onMade: (made: Array<{ code: string; name: string }>, parent?: string) => void;
+  onMade: (made: Array<{ code: string; name: string }>, parent: string | undefined, layout: Layout) => void; onCancel: () => void;
 }) {
   const { t } = useT();
   const [named, setNamed] = React.useState(false);
@@ -285,18 +287,22 @@ function BatchBoxes({ tenantId, boxes, run, onMade }: {
   const [names, setNames] = React.useState("");
   const [kind, setKind] = React.useState<m.Box["kind"]>("box");
   const [parentId, setParentId] = React.useState("");
+  const [start, setStart] = React.useState("");          // empty: after the highest number taken
+  const [layout, setLayout] = React.useState<Layout>("box");
   const [busy, setBusy] = React.useState(false);
+  const next = nextNumber(prefix || t("bx.batch.prefix"), boxes.map((b) => b.name));
   const make = async () => {
     setBusy(true);
     let made: Array<{ code: string; name: string }> = [];
     const ok = await run(async () => {
       made = await m.makeBoxes(tenantId, {
-        ...(named ? { names: names.split(/\r?\n/).map((x) => x.trim()).filter(Boolean) } : { n, prefix: prefix.trim() || undefined }),
+        ...(named ? { names: names.split(/\r?\n/).map((x) => x.trim()).filter(Boolean) }
+          : { n, prefix: prefix.trim() || undefined, start: Number(start) || next }),
         kind, parentId: parentId || undefined,
       });
     });
     setBusy(false);
-    if (ok) onMade(made, boxes.find((b) => b.id === parentId)?.name);
+    if (ok) onMade(made, boxes.find((b) => b.id === parentId)?.name, layout);
   };
   return (
     <form className="mk-form mk-batchboxes" onSubmit={(e) => { e.preventDefault(); void make(); }}>
@@ -309,17 +315,30 @@ function BatchBoxes({ tenantId, boxes, run, onMade }: {
         <label className="mk-field">{t("bx.batch.names")}
           <textarea className="mk-input" rows={4} value={names} onChange={(e) => setNames(e.target.value)} placeholder={t("bx.batch.namesEg")} /></label>
       ) : (
+        <>
         <div className="mk-toolbar">
           <label className="mk-field">{t("bx.batch.n")}
             <input className="mk-input mk-input--num" type="number" min={1} max={48} value={n} onChange={(e) => setN(Number(e.target.value))} /></label>
           <label className="mk-field">{t("bx.batch.prefixLabel")}
             <input className="mk-input" maxLength={60} value={prefix} onChange={(e) => setPrefix(e.target.value)} /></label>
+          <label className="mk-field">{t("bx.batch.start")}
+            <input className="mk-input mk-input--num" type="number" min={1} max={9999} value={start} placeholder={String(next).padStart(2, "0")}
+              onChange={(e) => setStart(e.target.value)} /></label>
         </div>
+        <p className="mk-muted">{t("bx.batch.names.preview", {
+          first: `${(prefix || t("bx.batch.prefix")).trim()} ${String(Number(start) || next).padStart(2, "0")}`,
+          last: `${(prefix || t("bx.batch.prefix")).trim()} ${String((Number(start) || next) + Math.max(0, n - 1)).padStart(2, "0")}` })}</p>
+        </>
       )}
       <div className="mk-toolbar">
         <label className="mk-field">{t("bx.f.kind")}
           <select className="mk-select" value={kind} onChange={(e) => setKind(e.target.value as m.Box["kind"])}>
             {m.BOX_KINDS.map((k) => <option key={k} value={k}>{t(`bx.kind.${k}`)}</option>)}
+          </select></label>
+        <label className="mk-field">{t("bx.batch.label")}
+          <select className="mk-select" value={layout} onChange={(e) => setLayout(e.target.value as Layout)}>
+            <option value="box">{t("lb.box")}</option>
+            <option value="smallbox">{t("lb.smallbox")}</option>
           </select></label>
         <label className="mk-field">{t("bx.batch.inside")}
           <select className="mk-select" value={parentId} onChange={(e) => setParentId(e.target.value)}>
@@ -328,7 +347,8 @@ function BatchBoxes({ tenantId, boxes, run, onMade }: {
           </select></label>
       </div>
       <button type="submit" className="mk-button" disabled={busy || (named ? !names.trim() : !(n >= 1 && n <= 48))}>
-        {t("bx.batch.make", { n: named ? names.split(/\n/).filter((x) => x.trim()).length : n })}</button>
+        {t("bx.batch.make", { n: named ? names.split(/\n/).filter((x) => x.trim()).length : n })}</button>{" "}
+      <button type="button" className="mk-button mk-button--ghost" onClick={onCancel}>{t("mt.cancel")}</button>
     </form>
   );
 }
@@ -443,6 +463,8 @@ function ArticlePanel({ tenantId, id, admin, onChanged, onLabels }: {
       <p className="mk-panel__hint">
         {[categoryName(a.category, lang, true), a.manufacturer, a.mpn, a.location && `${t("mt.f.location")}: ${a.location}`].filter(Boolean).join(" · ")}
         {a.datasheet && <> · <a href={a.datasheet} target="_blank" rel="noreferrer">{t("mt.f.datasheet")}</a></>}
+        {(a.supplierRefs ?? []).map((r) => { const l = m.shopLink(r); return <React.Fragment key={r}> · {l.href
+          ? <a href={l.href} target="_blank" rel="noreferrer">{l.label}</a> : l.label}</React.Fragment>; })}
       </p>
       {a.note && <p className="mk-panel__hint">{a.note}</p>}
       {a.proposed && (

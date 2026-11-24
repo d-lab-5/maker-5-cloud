@@ -10,6 +10,8 @@ import { callApi } from "./data";
 export interface Article {
   tenantId: string; id: string; name: string; category: string; tracking: "bulk" | "serial"; unit: string;
   manufacturer?: string; mpn?: string; minStock?: number; location?: string; note?: string; datasheet?: string;
+  /** Where it was bought (ADR-0023): "amazon.de:B0…". */
+  supplierRefs?: string[];
   onHand: number; reserved: number; free: number; low?: boolean; boxed?: number;
   /** Proposed by an edge's BOM import, not accepted yet (ADR-0014). */
   proposed?: { by: string; at: string };
@@ -102,8 +104,9 @@ export const bindCode = (tenantId: string, code: string, kind: "article" | "unit
 
 export const boxes = (tenantId: string, q = "", spaceId = "") => read<Box[]>("boxes", { tenantId, q, spaceId });
 export const box = (tenantId: string, id: string) => read<BoxDetail>("box", { tenantId, id });
+
 /** New boxes with their labels at once (an admin's): the names given, or n numbered "Box 01" on. */
-export const makeBoxes = (tenantId: string, b: { names?: string[]; n?: number; prefix?: string; kind: Box["kind"]; parentId?: string }) =>
+export const makeBoxes = (tenantId: string, b: { names?: string[]; n?: number; prefix?: string; start?: number; kind: Box["kind"]; parentId?: string }) =>
   change<Array<{ id: string; name: string; kind: Box["kind"]; code: string }>>("makeBoxes", { tenantId, ...b });
 export const saveBox = (tenantId: string, b: Partial<Box>) => change<Box>("saveBox", { tenantId, box: b });
 export const moveBox = (tenantId: string, id: string, to: { parentId?: string | null; location?: string }) => change("moveBox", { tenantId, id, ...to });
@@ -139,7 +142,7 @@ export interface IntakeItem {
   photos: Array<{ id: string; type: string; size: number }>;
   status: IntakeStatus; at: string; by: string;
   known?: { kind: string; id: string; name?: string };
-  suggestion?: { what: "device" | "box" | "bulk"; articleId?: string; article?: Partial<Article>; serial?: string; qty?: number; boxName?: string };
+  suggestion?: { what: "device" | "box" | "bulk"; articleId?: string; article?: Partial<Article>; serial?: string; qty?: number; boxName?: string; orderLineId?: string };
   again?: boolean;
 }
 export const intake = (tenantId: string, status = "") => read<IntakeItem[]>("intake", { tenantId, status });
@@ -153,6 +156,22 @@ export const intakeDescribe = (tenantId: string, id: string, suggestion: IntakeS
 /** An admin's, with two-step sign-in: makes the article, receives the stock, puts it in the place. */
 export const intakeCheckIn = (tenantId: string, id: string, suggestion?: IntakeSuggestion) =>
   change<{ item: string; kind: "unit" | "box" | "article"; id: string; articleId?: string }>("intakeCheckIn", { tenantId, id, suggestion });
+
+/* -- orders (ADR-0023): read from an order e-mail at the edge, expected until checked in -- */
+
+export interface OrderLine {
+  tenantId: string; id: string; supplier: string; orderRef: string; orderedAt?: string;
+  title: string; sku?: string; qty: number; arrived: number; unitPrice?: number; currency?: string;
+  what: "device" | "box" | "bulk"; articleId?: string; articleName?: string; article?: Partial<Article>;
+  status: "open" | "arrived" | "dropped"; at: string; by: string;
+}
+export const orders = (tenantId: string, status = "open") => read<OrderLine[]>("orders", { tenantId, status });
+export const orderDrop = (tenantId: string, id: string) => change("orderDrop", { tenantId, id });
+/** A shop's page for an article it sells, when we know how to link it (Amazon's /dp/ pages). */
+export function shopLink(ref: string): { label: string; href?: string } {
+  const [shop, sku] = ref.split(":");
+  return { label: `${shop} ${sku}`, href: /^amazon\.[a-z.]{2,6}$/.test(shop) && sku ? `https://www.${shop}/dp/${encodeURIComponent(sku)}` : undefined };
+}
 
 /** A photo for an item, shrunk in the browser to 1600 px at most, as JPEG, then sent straight to storage. */
 export async function intakePhoto(tenantId: string, id: string, file: File) {

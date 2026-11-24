@@ -12,7 +12,7 @@ import { CATEGORY_LIST } from "./categories.generated";
 export class Refused extends Error {}
 
 const ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz";
-export const mintId = (prefix: "a" | "u" | "x" | "i") =>
+export const mintId = (prefix: "a" | "u" | "x" | "i" | "o") =>
   `${prefix}-${Array.from({ length: 10 }, () => ALPHABET[randomInt(ALPHABET.length)]).join("")}`;
 export const ARTICLE = /^a-[23456789abcdefghjkmnpqrstuvwxyz]{10}$/;
 export const UNIT = /^u-[23456789abcdefghjkmnpqrstuvwxyz]{10}$/;
@@ -56,6 +56,8 @@ export type Tracking = (typeof TRACKING)[number];
 export interface Article {
   tenantId: string; id: string; name: string; category: string; tracking: Tracking; unit: string;
   manufacturer?: string; mpn?: string; minStock?: number; location?: string; note?: string; datasheet?: string;
+  /** Where it was bought (ADR-0023): "amazon.de:B0…". */
+  supplierRefs?: string[];
   onHand: number; reserved: number; free: number;
   /** How many of onHand sit in boxes (ADR-0011); never more than onHand. */
   boxed?: number;
@@ -86,6 +88,19 @@ export function qty(v: unknown, what = "A quantity"): number {
   return n;
 }
 
+/** Where an article was bought: "<shop's domain>:<its article number>", as amazon.de:B0… (ADR-0023). */
+export const SUPPLIER_REF = /^[a-z0-9.-]{2,40}:[A-Z0-9][A-Z0-9-]{3,39}$/;
+export const MAX_SUPPLIER_REFS = 5;
+
+/** An article's shops, merged: no doubles, the newest last, at most five. */
+export function supplierRefs(had: unknown, more: unknown = []): string[] | undefined {
+  const all = [...(Array.isArray(had) ? had : []), ...(Array.isArray(more) ? more : [more])]
+    .map((x) => String(x ?? "").trim()).filter(Boolean);
+  for (const r of all) if (!SUPPLIER_REF.test(r)) throw new Refused(`${r} is no shop's article number (shop:NUMBER).`);
+  const out = [...new Set(all)].slice(-MAX_SUPPLIER_REFS);
+  return out.length ? out : undefined;
+}
+
 /** The fields a person may set on an article; counts are never set this way. */
 export function articleFields(a: Record<string, unknown>, existing?: Article) {
   const name = text(a.name ?? existing?.name, 120);
@@ -111,6 +126,7 @@ export function articleFields(a: Record<string, unknown>, existing?: Article) {
     note: text(a.note ?? existing?.note, 500),
     // m5, the maker's parts, or dhc, a smart-home device (ADR-0022); m5 when not said
     family: (a.family ?? existing?.family) === "dhc" ? "dhc" as const : undefined,
+    supplierRefs: supplierRefs(a.supplierRefs ?? existing?.supplierRefs),
   };
 }
 
@@ -200,11 +216,12 @@ export function boxFields(b: Record<string, unknown>, existing?: Box) {
 /**
  * The names of a batch of new boxes, made with their labels at once: the
  * names given (one a line), or `n` numbered after the highest of `prefix`
- * already taken ("Box 01" … "Box 21", then "Box 22" next time). Two digits,
+ * already taken ("Box 01" … "Box 21", then "Box 22" next time), or from
+ * `start`, never onto a name that is taken. Two digits,
  * so the labels sort; a number is what stays on the box while its contents
  * change.
  */
-export function batchNames(b: { names?: unknown; n?: unknown; prefix?: unknown }, taken: string[]): string[] {
+export function batchNames(b: { names?: unknown; n?: unknown; prefix?: unknown; start?: unknown }, taken: string[]): string[] {
   const given = (Array.isArray(b.names) ? b.names : String(b.names ?? "").split(/\r?\n/))
     .map((x) => text(x, 120)).filter((x): x is string => Boolean(x));
   if (given.length) {
@@ -217,7 +234,13 @@ export function batchNames(b: { names?: unknown; n?: unknown; prefix?: unknown }
   const esc = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const re = new RegExp(`^${esc} (\\d+)$`, "i");
   const top = taken.reduce((m, x) => Math.max(m, Number(re.exec(x)?.[1] ?? 0)), 0);
-  return Array.from({ length: n }, (_, i) => `${prefix} ${String(top + i + 1).padStart(2, "0")}`);
+  const asked = b.start === undefined || b.start === null || b.start === "" ? top + 1 : Math.floor(Number(b.start));
+  if (!(asked >= 1 && asked <= 9999)) throw new Refused("Numbers start at 1.");
+  const names = Array.from({ length: n }, (_, i) => `${prefix} ${String(asked + i).padStart(2, "0")}`);
+  const have = new Set(taken.map((x) => x.toLowerCase()));
+  const twice = names.find((x) => have.has(x.toLowerCase()));
+  if (twice) throw new Refused(`${twice} exists already: start after it.`);
+  return names;
 }
 
 /** A link a person adds to a box: an https URL of one of the known kinds. */

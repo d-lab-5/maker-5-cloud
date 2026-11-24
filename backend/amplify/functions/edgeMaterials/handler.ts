@@ -54,6 +54,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
       }
       // a BOM import proposes the articles it needs; an admin accepts them (ADR-0014)
       case "propose": return json(200, await st.proposeArticles(actor, tenant, b.articles));
+      case "orders/list": return json(200, { lines: await st.ordersList(actor, tenant, b.status === undefined ? "open" : String(b.status)) });
+      case "orders/add": return json(200, await st.ordersAdd(actor, tenant, b));
       case "intake/list": return json(200, { items: await st.intakeList(actor, tenant, String(b.status ?? "")) });
       case "intake/get": return json(200, await st.intakeGet(actor, tenant, String(b.id ?? "")));
       case "intake/describe": return json(200, await st.intakeDescribe(actor, tenant, String(b.id ?? ""), b.suggestion ?? {}));

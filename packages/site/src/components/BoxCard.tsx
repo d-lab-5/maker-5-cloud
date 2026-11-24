@@ -59,6 +59,10 @@ export function BoxCard({ tenantId, id }: { tenantId: string; id: string }) {
 
   return (
     <div className="mk-card mk-boxcard">
+      <nav className="mk-back mk-noprint">
+        <a href={b.parentId ? m.boxHref(tenantId, b.parentId) : `/materials/?w=${encodeURIComponent(tenantId)}&tab=boxes`}>
+          ← {b.parentId ? (d.path[d.path.length - 1]?.name ?? t("bx.back.box")) : t("bx.back.all")}</a>
+      </nav>
       {labels && (
         <LabelSheet tenantId={tenantId} layout="box" onClose={() => setLabels(null)}
           items={[{ code: labels.id, title: b.name, sub: d.space?.name ?? b.location ?? "" }]} />
@@ -88,7 +92,10 @@ export function BoxCard({ tenantId, id }: { tenantId: string; id: string }) {
 
       {panel === "in" && <CheckIn tenantId={tenantId} boxId={id} admin={admin} onDone={(msg) => { setOk(msg); load(); }} onError={setError} />}
       {panel === "move" && <MoveBox tenantId={tenantId} box={b} run={run} />}
-      {panel === "edit" && <EditBox tenantId={tenantId} box={b} spaces={spaces} run={run} />}
+      {panel === "edit" && <EditBox tenantId={tenantId} box={b} spaces={spaces} run={run} onCancel={() => setPanel("")} />}
+      {(panel === "in" || panel === "move") && (
+        <p><button type="button" className="mk-button mk-button--ghost" onClick={() => setPanel("")}>{t("mt.cancel")}</button></p>
+      )}
       {ok && <p className="mk-ok" role="status">{ok}</p>}
       {error && <p className="mk-error" role="alert">{error}</p>}
 
@@ -266,9 +273,9 @@ function MoveBox({ tenantId, box, run }: { tenantId: string; box: m.Box; run: (f
   );
 }
 
-export function EditBox({ tenantId, box, spaces, run, onSaved }: {
+export function EditBox({ tenantId, box, spaces, run, onSaved, onCancel }: {
   tenantId: string; box?: m.Box; spaces: Space[];
-  run: (fn: () => Promise<unknown>, done: string) => Promise<boolean>; onSaved?: (b: m.Box) => void;
+  run: (fn: () => Promise<unknown>, done: string) => Promise<boolean>; onSaved?: (b: m.Box) => void; onCancel?: () => void;
 }) {
   const { t } = useT();
   const [f, setF] = React.useState<Partial<m.Box>>(box ? { id: box.id, name: box.name, kind: box.kind, spaceId: box.spaceId ?? "", location: box.location ?? "", note: box.note ?? "" } : { kind: "box", spaceId: "" });
@@ -288,7 +295,10 @@ export function EditBox({ tenantId, box, spaces, run, onSaved }: {
       </select>
       {!box && <input className="mk-input" placeholder={t("bx.move.place")} value={f.location ?? ""} onChange={set("location")} />}
       <textarea className="mk-input" placeholder={t("mt.f.note")} value={f.note ?? ""} onChange={set("note")} rows={2} />
-      <button type="submit" className="mk-button">{t("mt.save")}</button>
+      <span>
+        <button type="submit" className="mk-button">{t("mt.save")}</button>{" "}
+        {onCancel && <button type="button" className="mk-button mk-button--ghost" onClick={onCancel}>{t("mt.cancel")}</button>}
+      </span>
     </form>
   );
 }

@@ -12,6 +12,7 @@
 //   MkBoxes        tenantId, id                    boxes (ADR-0011); byParent, bySpace
 //   MkBoxStock     boxId, articleId                counted parts in a box; byArticle
 //   MkIntake       tenantId, id                    what was scanned at the shelf, to check in (ADR-0022)
+//   MkOrderLines   tenantId, id                    what was bought, expected until checked in (ADR-0023)
 
 import { randomBytes } from "node:crypto";
 import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
@@ -21,13 +22,14 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { doc, getSpace, spacesOfTenant, type Space } from "../shared/spaces";
 import { activeAt, edgeSeen } from "../graph-shared/activity";
+import { MAX_LINES, MAX_OPEN, arrive, fromLine, lineFields, lineKey, orderFields, supplierRef, type OrderLine } from "./orders";
 import { BadCode, codeKey, family as familyOf, labelUrl, mintOwn, normalise, type Code, type Family } from "./codes";
 import {
   MAX_PHOTOS, articleOf, captureFields, photoFields, plan, suggestionFields, type IntakeItem, type Status, type Suggestion,
 } from "./intake";
 import {
   ARTICLE, BOX, MAX_FILE_BYTES, MAX_FILES, MAX_LINKS, LINK_KINDS, UNIT, Refused, UNIT_STEP, articleFields, boxFields, boxFits, boxable,
-  batchNames, counts, fileName, linkFields, mintId, qty, wouldLoop, accepted, proposalFields, MAX_PROPOSED, MAX_BOX_DEPTH,
+  batchNames, supplierRefs, counts, fileName, linkFields, mintId, qty, wouldLoop, accepted, proposalFields, MAX_PROPOSED, MAX_BOX_DEPTH,
   category as stockCategory, inCategory, catalogue,
   type Article, type Box, type BoxFile, type BoxLink, type Step, type Unit
 } from "./stock";
@@ -43,6 +45,7 @@ const T = {
   boxes: () => process.env.BOXES_TABLE_NAME!,
   boxStock: () => process.env.BOXSTOCK_TABLE_NAME!,
   intake: () => process.env.INTAKE_TABLE_NAME!,
+  orders: () => process.env.ORDERS_TABLE_NAME!,
 };
 
 /** Who is asking, and what they may do. */
@@ -783,7 +786,7 @@ export async function saveBox(actor: Actor, tenantId: string, b: Record<string, 
  */
 export async function makeBoxes(actor: Actor, tenantId: string, b: Record<string, unknown>) {
   administers(actor, tenantId);
-  const taken = b.names ? [] : (await listBoxes(actor, tenantId)).map((x) => x.name);
+  const taken = b.names ? [] : (await listBoxes(actor, tenantId)).map((x) => x.name);   // the numbers in use
   const names = batchNames(b, taken);
   const out: Array<{ id: string; name: string; kind: Box["kind"]; code: string }> = [];
   for (const name of names) {
@@ -1191,7 +1194,7 @@ export async function intakeDescribe(actor: Actor, tenantId: string, id: string,
   reads(actor, tenantId);
   const item = await mustIntake(tenantId, id);
   if (!OPEN.includes(item.status)) throw new Refused("This item is closed.");
-  const s = suggestionFields(raw ?? {}, item);
+  const s = suggestionFields(await withLine(tenantId, raw ?? {}), item);
   if (s.articleId) accepted(await mustArticle(tenantId, s.articleId));
   try {
     await doc.send(new UpdateCommand({
@@ -1232,7 +1235,8 @@ export async function intakeDrop(actor: Actor, tenantId: string, id: string) {
 export async function intakeCheckIn(actor: Actor, tenantId: string, id: string, edits?: Record<string, unknown>) {
   administers(actor, tenantId);        // it makes articles and receives stock: an admin's, as on the site
   const item = await mustIntake(tenantId, id);
-  const s: Suggestion | undefined = edits ? suggestionFields(edits, item) : item.suggestion;
+  const s: Suggestion | undefined = edits ? suggestionFields(await withLine(tenantId, edits), item) : item.suggestion;
+  const line = s?.orderLineId && !item.known ? await mustOrderLine(tenantId, s.orderLineId) : undefined;
   const articleId = articleOf(item, s);
   const existing = articleId ? await mustArticle(tenantId, articleId) : undefined;
   const p = plan(item, s, existing);
@@ -1258,19 +1262,22 @@ export async function intakeCheckIn(actor: Actor, tenantId: string, id: string, 
   const bulk = p.what !== "device";
   const tx: unknown[] = [];
   let aid: string;
+  // where it was bought, from its order line (ADR-0023)
+  const bought = line ? supplierRef(line) : undefined;
+  const refs = bought ? supplierRefs(existing?.supplierRefs, bought) : undefined;
   if (existing) {
     aid = existing.id;
     tx.push({ Update: {
       TableName: T.articles(), Key: { tenantId, id: aid },
-      UpdateExpression: "SET updatedAt = :at ADD onHand :q, #f :q" + (bulk ? ", boxed :q" : ""),
+      UpdateExpression: "SET updatedAt = :at" + (refs ? ", supplierRefs = :sr" : "") + " ADD onHand :q, #f :q" + (bulk ? ", boxed :q" : ""),
       ConditionExpression: "attribute_exists(id) AND attribute_not_exists(proposed)",
-      ExpressionAttributeNames: { "#f": "free" }, ExpressionAttributeValues: { ":at": at, ":q": q },
+      ExpressionAttributeNames: { "#f": "free" }, ExpressionAttributeValues: { ":at": at, ":q": q, ...(refs ? { ":sr": refs } : {}) },
     } });
   } else {
     aid = mintId("a");
     tx.push({ Put: {
       TableName: T.articles(), ConditionExpression: "attribute_not_exists(id)",
-      Item: JSON.parse(JSON.stringify({ ...s!.article, tenantId, id: aid, onHand: q, free: q, reserved: 0, ...(bulk ? { boxed: q } : {}),
+      Item: JSON.parse(JSON.stringify({ ...s!.article, ...(refs ? { supplierRefs: refs } : {}), tenantId, id: aid, onHand: q, free: q, reserved: 0, ...(bulk ? { boxed: q } : {}),
         intake: { by: actor.by, at }, createdAt: at, updatedAt: at, createdBy: actor.by })),
     } });
   }
@@ -1325,9 +1332,97 @@ export async function intakeCheckIn(actor: Actor, tenantId: string, id: string, 
       }
     }
   }
+  if (line) {
+    const next = arrive(line, q);
+    tx.push({ Update: {
+      TableName: T.orders(), Key: { tenantId, id: line.id },
+      UpdateExpression: "SET arrived = :a, #s = :st, arrivals = list_append(if_not_exists(arrivals, :none), :one), articleId = :aid",
+      ConditionExpression: "#s = :open AND arrived = :was", ExpressionAttributeNames: { "#s": "status" },
+      ExpressionAttributeValues: { ":a": next.arrived, ":st": next.status, ":open": "open", ":was": line.arrived ?? 0, ":aid": aid,
+        ":none": [], ":one": [{ intakeId: id, qty: q, at, by: actor.by }] },
+    } });
+  }
   tx.push(close(done));
   await transact(tx, "Someone changed this meanwhile, or the label was bound already; look again.");
-  return { item: id, ...done, place: place.id };
+  return { item: id, ...done, place: place.id, ...(line ? { orderLine: line.id } : {}) };
+}
+
+/* -------------------------------------------------------------- orders ---- *
+ * What was bought (ADR-0023): lines an edge read from an order e-mail,
+ * expected until the intake checks an item in against one. Anyone in the
+ * organisation adds and drops them; only the check-in books stock.
+ */
+
+async function ordersOf(tenantId: string): Promise<OrderLine[]> {
+  return query<OrderLine>({ TableName: T.orders(), KeyConditionExpression: "tenantId = :t", ExpressionAttributeValues: { ":t": tenantId } }, 5000);
+}
+
+async function mustOrderLine(tenantId: string, id: string): Promise<OrderLine> {
+  const r = await doc.send(new GetCommand({ TableName: T.orders(), Key: { tenantId, id } }));
+  if (!r.Item) throw new Refused("No such order line.");
+  return r.Item as OrderLine;
+}
+
+/** A suggestion with its order line's article, kind and quantity where it says none. */
+async function withLine(tenantId: string, raw: Record<string, unknown>) {
+  if (!raw.orderLineId) return raw;
+  const line = await mustOrderLine(tenantId, String(raw.orderLineId));
+  if (line.status !== "open") throw new Refused(line.status === "dropped" ? "That order line was dropped." : "Everything of that order line has arrived already.");
+  return fromLine(raw, line);
+}
+
+/** The lines of one order; a line imported before is skipped, not doubled. */
+export async function ordersAdd(actor: Actor, tenantId: string, o: Record<string, unknown>) {
+  reads(actor, tenantId);
+  const head = orderFields(o);
+  const raw = Array.isArray(o.lines) ? (o.lines as Record<string, unknown>[]) : [];
+  if (!raw.length) throw new Refused("An order needs at least one line.");
+  if (raw.length > MAX_LINES) throw new Refused(`At most ${MAX_LINES} lines at once.`);
+  const lines = raw.map((l) => lineFields(l ?? {}));
+  for (const l of lines) if (l.articleId) await mustArticle(tenantId, l.articleId);
+  const have = await ordersOf(tenantId);
+  if (have.filter((x) => x.status === "open").length + lines.length > MAX_OPEN) throw new Refused(`At most ${MAX_OPEN} order lines wait at once.`);
+  const keys = new Set(have.map((x) => x.key));
+  const at = now();
+  const added: OrderLine[] = [];
+  let skipped = 0;
+  for (const l of lines) {
+    const key = lineKey(head.supplier, head.orderRef, l);
+    if (keys.has(key)) { skipped++; continue; }
+    keys.add(key);
+    const item = JSON.parse(JSON.stringify({ ...head, ...l, tenantId, id: mintId("o"), arrived: 0, status: "open", key, at, by: actor.by })) as OrderLine;
+    await doc.send(new PutCommand({ TableName: T.orders(), Item: item, ConditionExpression: "attribute_not_exists(id)" }));
+    added.push(item);
+  }
+  return { added, skipped };
+}
+
+/** The open lines (or those of a status), the newest order first. */
+export async function ordersList(actor: Actor, tenantId: string, status = "open") {
+  reads(actor, tenantId);
+  const all = await ordersOf(tenantId);
+  const names = Object.fromEntries((await Promise.all([...new Set(all.map((x) => x.articleId).filter(Boolean))]
+    .map((a) => getArticleRow(tenantId, a!)))).filter(Boolean).map((a) => [a!.id, a!.name]));
+  return all.filter((x) => !status || x.status === status)
+    .map((x) => ({ ...x, articleName: x.articleId ? names[x.articleId] : undefined }))
+    .sort((a, b) => (b.orderedAt ?? b.at).localeCompare(a.orderedAt ?? a.at) || a.title.localeCompare(b.title));
+}
+
+/** Not coming after all, or not to be counted: a cancelled order, a return. */
+export async function orderDrop(actor: Actor, tenantId: string, id: string) {
+  reads(actor, tenantId);
+  await mustOrderLine(tenantId, id);
+  try {
+    await doc.send(new UpdateCommand({
+      TableName: T.orders(), Key: { tenantId, id }, UpdateExpression: "SET #s = :x, droppedBy = :by, droppedAt = :at",
+      ConditionExpression: "#s = :open", ExpressionAttributeNames: { "#s": "status" },
+      ExpressionAttributeValues: { ":x": "dropped", ":open": "open", ":by": actor.by, ":at": now() },
+    }));
+  } catch (e) {
+    if ((e as { name?: string }).name === "ConditionalCheckFailedException") throw new Refused("That order line is closed.");
+    throw e;
+  }
+  return { dropped: id };
 }
 
 /* ------------------------------------------------------------ helpers ---- */
