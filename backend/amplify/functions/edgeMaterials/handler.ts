@@ -18,7 +18,7 @@ import { linkedAdmin } from "../edge-shared/linkedAdmin";
 import * as st from "../materials-shared/store";
 
 type Body = { q?: string; category?: string; id?: string; code?: string; spaceId?: string; articleId?: string;
-  qty?: number; unitId?: string; note?: string; articles?: unknown; status?: string; suggestion?: Record<string, unknown> };
+  qty?: number; unitId?: string; note?: string; articles?: unknown; status?: string; suggestion?: Record<string, unknown>; ref?: string };
 
 export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> => {
   const tooOld = versionGate(event);
@@ -56,6 +56,10 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
       case "propose": return json(200, await st.proposeArticles(actor, tenant, b.articles));
       case "orders/list": return json(200, { lines: await st.ordersList(actor, tenant, b.status === undefined ? "open" : String(b.status)) });
       case "orders/add": return json(200, await st.ordersAdd(actor, tenant, b));
+      // a supplier's documents onto the parts they concern (ADR-0024)
+      case "docs/upload": return json(200, await st.docUpload(actor, tenant, b));
+      case "docs/attach": return json(200, await st.docAttach(actor, tenant, b));
+      case "article/ref": return json(200, await st.articleRef(actor, tenant, String(b.articleId ?? ""), String(b.ref ?? "")));
       case "intake/list": return json(200, { items: await st.intakeList(actor, tenant, String(b.status ?? "")) });
       case "intake/get": return json(200, await st.intakeGet(actor, tenant, String(b.id ?? "")));
       case "intake/describe": return json(200, await st.intakeDescribe(actor, tenant, String(b.id ?? ""), b.suggestion ?? {}));

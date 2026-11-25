@@ -38,6 +38,8 @@ export interface OrderLine {
   key: string;
   at: string; by: string;
   arrivals?: Array<{ intakeId: string; qty: number; at: string; by: string }>;
+  /** Documents that came with it (ADR-0024); a check-in moves them onto its article. */
+  files?: import("./docs").DocFile[];
 }
 
 const text = (v: unknown, max: number) => {

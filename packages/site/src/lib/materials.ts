@@ -15,7 +15,10 @@ export interface Article {
   onHand: number; reserved: number; free: number; low?: boolean; boxed?: number;
   /** Proposed by an edge's BOM import, not accepted yet (ADR-0014). */
   proposed?: { by: string; at: string };
+  /** Its documents (ADR-0024): invoices, delivery notes, service reports. */
+  files?: ArticleFile[];
 }
+export interface ArticleFile { id: string; kind: LinkKind; name: string; size: number; type: string; sha256?: string; source?: string; at: string; by: string }
 export interface Unit {
   tenantId: string; id: string; articleId: string; serial?: string; state: "in-stock" | "reserved" | "in-use" | "retired";
   spaceId?: string; parentId?: string; location?: string; articleName?: string;
@@ -26,7 +29,7 @@ export interface Movement { sk: string; at: string; kind: string; articleId?: st
 
 /** A box (ADR-0011 in maker-5-shared): it holds units, counted parts and other boxes, with links and files. */
 export const BOX_KINDS = ["box", "bag", "folder", "drawer", "shelf", "cabinet", "bench"] as const;
-export const LINK_KINDS = ["firmware", "cad", "schematic", "datasheet", "docs", "repo", "other"] as const;
+export const LINK_KINDS = ["firmware", "cad", "schematic", "datasheet", "docs", "receipt", "repo", "other"] as const;
 export type LinkKind = (typeof LINK_KINDS)[number];
 export interface BoxLink { id: string; kind: LinkKind; title: string; url: string; at: string; by: string }
 export interface BoxFile { id: string; kind: LinkKind; name: string; size: number; type: string; at: string; by: string }
@@ -119,6 +122,11 @@ export const addLink = (tenantId: string, boxId: string, link: { url: string; ki
 export const removeLink = (tenantId: string, boxId: string, linkId: string) => change("removeLink", { tenantId, boxId, linkId });
 export const fileUrl = (tenantId: string, boxId: string, fileId: string) => change<{ url: string; name: string }>("fileUrl", { tenantId, boxId, fileId });
 export const removeFile = (tenantId: string, boxId: string, fileId: string) => change("removeFile", { tenantId, boxId, fileId });
+/** A part's documents (ADR-0024). */
+export const articleFileUrl = (tenantId: string, articleId: string, fileId: string) =>
+  change<{ url: string; name: string }>("articleFileUrl", { tenantId, articleId, fileId });
+export const articleFileRemove = (tenantId: string, articleId: string, fileId: string) =>
+  change("articleFileRemove", { tenantId, articleId, fileId });
 
 /**
  * Upload one file to a box: ask for a short-lived URL, send the file straight
