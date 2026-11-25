@@ -33,7 +33,7 @@ import {
 } from "./intake";
 import {
   ARTICLE, BOX, MAX_FILE_BYTES, MAX_FILES, MAX_LINKS, LINK_KINDS, UNIT, Refused, UNIT_STEP, articleFields, boxFields, boxFits, boxable,
-  batchNames, supplierRefs, SUPPLIER_REF, counts, fileName, linkFields, mintId, qty, wouldLoop, accepted, proposalFields, MAX_PROPOSED, MAX_BOX_DEPTH,
+  batchNames, supplierRefs, SUPPLIER_REF, counts, fileName, linkFields, mintId, qty, wouldLoop, accepted, deletable, proposalFields, MAX_PROPOSED, MAX_BOX_DEPTH,
   category as stockCategory, inCategory, catalogue,
   type Article, type Box, type BoxFile, type BoxLink, type Step, type Unit
 } from "./stock";
@@ -383,6 +383,65 @@ export async function dropProposed(actor: Actor, tenantId: string, id: string) {
     ConditionExpression: "attribute_exists(proposed) AND onHand = :z", ExpressionAttributeValues: { ":z": 0 },
   }));
   return { deleted: id };
+}
+
+/**
+ * An admin deletes an article made by mistake (as bulk when it is counted
+ * unit by unit, or twice). What it has simply in stock goes with it: its
+ * units, its lines in boxes, its codes (ours become blank again) and its
+ * documents. Refused while anything of it is reserved or in use, while a
+ * unit has something installed, or while an open order line expects it:
+ * that is a workspace's history, not a mistake.
+ */
+export async function deleteArticle(actor: Actor, tenantId: string, id: string) {
+  administers(actor, tenantId);
+  const a = await mustArticle(tenantId, id);
+  const [units, allocations, held, codes, lines] = await Promise.all([
+    query<Unit>({ TableName: T.units(), IndexName: "byArticle", KeyConditionExpression: "articleId = :a", ExpressionAttributeValues: { ":a": id } }),
+    query<{ spaceId: string; reserved?: number }>({
+      TableName: T.allocations(), IndexName: "byArticle", KeyConditionExpression: "articleId = :a", ExpressionAttributeValues: { ":a": id },
+    }),
+    query<{ boxId: string; qty: number }>({
+      TableName: T.boxStock(), IndexName: "byArticle", KeyConditionExpression: "articleId = :a", ExpressionAttributeValues: { ":a": id },
+    }),
+    codesOf(id),
+    ordersOf(tenantId),
+  ]);
+  const inside = (await Promise.all(units.map((u) => query<Unit>({
+    TableName: T.units(), IndexName: "byParent", KeyConditionExpression: "parentId = :p", ExpressionAttributeValues: { ":p": u.id },
+  }, 1)))).flat();
+  const why = deletable(a, { units, allocations, inside: inside.length, expected: lines.some((l) => l.status === "open" && l.articleId === id) });
+  if (why) throw new Refused(why);
+
+  // the row first, as it was read: nothing was taken meanwhile
+  try {
+    await doc.send(new DeleteCommand({
+      TableName: T.articles(), Key: { tenantId, id },
+      ConditionExpression: "reserved = :z AND onHand = :n", ExpressionAttributeValues: { ":z": 0, ":n": a.onHand },
+    }));
+  } catch (e) {
+    if ((e as { name?: string }).name === "ConditionalCheckFailedException") throw new Refused("Someone changed this meanwhile; look again.");
+    throw e;
+  }
+  const unitCodes = (await Promise.all(units.map((u) => codesOf(u.id)))).flat();
+  for (const c of [...codes, ...unitCodes]) {
+    await doc.send(new UpdateCommand({
+      TableName: T.codes(), Key: { pk: c.pk },
+      UpdateExpression: c.kind === "m5" ? "REMOVE #tg, targetKind, boundBy, boundAt" : "SET retiredAt = :at REMOVE #tg, targetKind",
+      ExpressionAttributeNames: { "#tg": "target" }, ...(c.kind === "m5" ? {} : { ExpressionAttributeValues: { ":at": now() } }),
+    }));
+  }
+  for (const u of units) await doc.send(new DeleteCommand({ TableName: T.units(), Key: { tenantId, id: u.id } }));
+  for (const h of held) await doc.send(new DeleteCommand({ TableName: T.boxStock(), Key: { boxId: h.boxId, articleId: id } }));
+  for (const x of allocations) await doc.send(new DeleteCommand({ TableName: T.allocations(), Key: { spaceId: x.spaceId, articleId: id } }));
+  for (const f of a.files ?? []) {
+    const still = await docsLike(tenantId, { id: f.id });
+    if (!still.articles.length && !still.lines.length) await s3.send(new DeleteObjectCommand({ Bucket: BUCKET(), Key: docKey(tenantId, f.id) }));
+  }
+  await doc.send(new PutCommand({ TableName: T.movements(), Item: {
+    sk: sk(), at: now(), tenantId, kind: "retire", articleId: id, qty: a.onHand, by: actor.by, note: `deleted ${a.name}`,
+  } }));
+  return { deleted: id, units: units.length, boxes: held.filter((h) => h.qty > 0).length };
 }
 
 /** Stock comes in: a quantity of a bulk article, or units of a serialised one. */

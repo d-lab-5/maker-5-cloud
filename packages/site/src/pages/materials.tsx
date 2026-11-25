@@ -165,6 +165,7 @@ const MaterialsPage: React.FC<PageProps> = () => {
             </table>
           </div>
           {open && <ArticlePanel key={open} tenantId={w} id={open} admin={admin} onChanged={load}
+            onDeleted={() => { setOpen(""); load(); }}
             onLabels={(items, layout) => setLabels({ items, layout })} />}
           {admin && (
             <div className="mk-panel">
@@ -403,8 +404,9 @@ function ArticleForm({ tenantId, article, onDone }: { tenantId: string; article?
   );
 }
 
-function ArticlePanel({ tenantId, id, admin, onChanged, onLabels }: {
-  tenantId: string; id: string; admin: boolean; onChanged: () => void; onLabels: (items: LabelItem[], layout: Layout) => void;
+function ArticlePanel({ tenantId, id, admin, onChanged, onDeleted, onLabels }: {
+  tenantId: string; id: string; admin: boolean; onChanged: () => void; onDeleted: () => void;
+  onLabels: (items: LabelItem[], layout: Layout) => void;
 }) {
   const { t, lang } = useT();
   const [d, setD] = React.useState<Awaited<ReturnType<typeof m.article>> | null>(null);
@@ -454,6 +456,16 @@ function ArticlePanel({ tenantId, id, admin, onChanged, onLabels }: {
       <h2 className="mk-panel__title">{a.name}{" "}
         {admin && <button type="button" className="mk-linkbutton" onClick={() => setEditing(!editing)}>{t("mt.edit")}</button>}</h2>
       {editing && <ArticleForm tenantId={tenantId} article={a} onDone={(x) => { setEditing(false); if (x) { load(); onChanged(); } }} />}
+      {editing && !a.proposed && (
+        <p className="mk-panel__hint">
+          <button type="button" className="mk-linkbutton mk-danger" onClick={() => {
+            const units = d.units.length;
+            if (!window.confirm(t("mt.delete.ask", { name: a.name, n: a.tracking === "serial" ? units : a.onHand }))) return;
+            setError(null);
+            m.deleteArticle(tenantId, a.id).then(() => onDeleted(), (e) => setError(message(e)));
+          }}>{t("mt.delete")}</button>
+        </p>
+      )}
       <dl className="mk-stats">
         <div className="mk-stat"><dt>{a.onHand}</dt><dd>{t("mt.onhand")}</dd></div>
         <div className="mk-stat"><dt>{a.reserved}</dt><dd>{t("mt.reserved")}</dd></div>
@@ -525,7 +537,16 @@ function ArticlePanel({ tenantId, id, admin, onChanged, onLabels }: {
               <button type="submit" className="mk-button">{t("mt.receive")}</button>
             </form>
           )}
-          <button type="button" className="mk-button mk-button--ghost" onClick={() => void labelsFor(a.tracking === "serial" ? "tiny" : "article")}>{t("mt.labels")}</button>
+          {a.tracking === "serial" ? (
+            // the same code twice if wanted: on the device, and on its package
+            <>
+              <button type="button" className="mk-button mk-button--ghost" onClick={() => void labelsFor("smallbox")}>{t("mt.lb.small")}</button>
+              <button type="button" className="mk-button mk-button--ghost" onClick={() => void labelsFor("article")}>{t("mt.lb.large")}</button>
+              <button type="button" className="mk-button mk-button--ghost" onClick={() => void labelsFor("box")}>{t("mt.lb.package")}</button>
+            </>
+          ) : (
+            <button type="button" className="mk-button mk-button--ghost" onClick={() => void labelsFor("article")}>{t("mt.labels")}</button>
+          )}
         </div>
       )}
       {ok && <p className="mk-ok" role="status">{ok}</p>}

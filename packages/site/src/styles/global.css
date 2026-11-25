@@ -1286,3 +1286,6 @@ a {
 .mk-docs__list li { padding: .2rem 0; overflow-wrap: anywhere; }
 .mk-intakebox__expected { margin-top: 1.5rem; }
 .mk-intakebox__expected h3 { font-size: 1rem; margin: 0 0 .25rem; }
+
+/* a step that cannot be undone */
+.mk-linkbutton.mk-danger { color: var(--mk-danger); }
