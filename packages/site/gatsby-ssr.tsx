@@ -31,6 +31,8 @@ export const onRenderBody: GatsbySSR["onRenderBody"] = ({
   // palette the page is about to paint.
   setHeadComponents([
     <link key="mk-icon" rel="icon" href="/favicon.svg" type="image/svg+xml" />,
+    // a phone's home screen wants a square picture (iOS takes no SVG here)
+    <link key="mk-touch" rel="apple-touch-icon" href="/apple-touch-icon.png" />,
     <meta
       key="mk-theme-light"
       name="theme-color"
