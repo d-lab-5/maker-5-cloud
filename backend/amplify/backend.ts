@@ -340,7 +340,9 @@ allow(backend.materials.resources.lambda, ["dynamodb:DeleteItem"], [boxesTable.t
 // A proposed article an admin turns down (ADR-0014): it never had stock.
 allow(backend.materials.resources.lambda, ["dynamodb:DeleteItem"], [articlesTable.tableArn]);
 // A box's files: under boxes/ only, never a space's object; the intake's photos under intake/.
-allow(backend.materials.resources.lambda, ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"], [`${bucket.bucketArn}/boxes/*`, `${bucket.bucketArn}/intake/*`]);
+// A part's documents (ADR-0024) under docs/.
+allow(backend.materials.resources.lambda, ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+  [`${bucket.bucketArn}/boxes/*`, `${bucket.bucketArn}/intake/*`, `${bucket.bucketArn}/docs/*`]);
 backend.materials.addEnvironment("OBJECT_BUCKET_NAME", bucket.bucketName);
 // An edge reads everything and changes counts, units, allocations and the
 // log through its steps; it never writes codes.
@@ -354,6 +356,9 @@ allow(backend.edgeMaterials.resources.lambda, ["dynamodb:UpdateItem", "dynamodb:
 allow(backend.edgeMaterials.resources.lambda, ["dynamodb:UpdateItem", "dynamodb:PutItem", "dynamodb:ConditionCheckItem"],
   [intakeTable.tableArn, boxesTable.tableArn, boxStockTable.tableArn, codesTable.tableArn, ordersTable.tableArn]);
 allow(backend.edgeMaterials.resources.lambda, ["s3:GetObject", "s3:DeleteObject"], [`${bucket.bucketArn}/intake/*`]);
+// A supplier's documents (ADR-0024): the edge uploads them (a signed PUT) and
+// checks they arrived; it never deletes one.
+allow(backend.edgeMaterials.resources.lambda, ["s3:GetObject", "s3:PutObject"], [`${bucket.bucketArn}/docs/*`]);
 backend.edgeMaterials.addEnvironment("OBJECT_BUCKET_NAME", bucket.bucketName);
 // checking in the intake is an admin's: the edge asks whether the person who
 // linked it is one (functions/edge-shared/linkedAdmin.ts). The edge stack may
@@ -383,7 +388,8 @@ const routes: Array<[string, lambda.IFunction]> = [
   ["/edge/v1/repo", backend.edgeGraphs.resources.lambda],
   ["/edge/v1/models", backend.edgeModels.resources.lambda],
   ...["list", "get", "unit", "resolve", "product", "reserve", "release", "return", "boxes", "box", "propose", "categories", "idle",
-    "intake/list", "intake/get", "intake/describe", "intake/checkin", "intake/drop"].map(
+    "intake/list", "intake/get", "intake/describe", "intake/checkin", "intake/drop",
+    "orders/list", "orders/add", "docs/upload", "docs/attach", "article/ref"].map(
     (r) => [`/edge/v1/materials/${r}`, backend.edgeMaterials.resources.lambda] as [string, lambda.IFunction]),
 ];
 for (const [path, fn] of routes) {

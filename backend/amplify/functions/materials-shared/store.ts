@@ -13,6 +13,9 @@
 //   MkBoxStock     boxId, articleId                counted parts in a box; byArticle
 //   MkIntake       tenantId, id                    what was scanned at the shelf, to check in (ADR-0022)
 //   MkOrderLines   tenantId, id                    what was bought, expected until checked in (ADR-0023)
+//
+// Documents of a part (ADR-0024) are in S3 under docs/<tenant>/<file>, once
+// each, listed in `files` on every article and order line they concern.
 
 import { randomBytes } from "node:crypto";
 import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
@@ -22,6 +25,7 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { doc, getSpace, spacesOfTenant, type Space } from "../shared/spaces";
 import { activeAt, edgeSeen } from "../graph-shared/activity";
+import { DOC_ID, MAX_DOCS as MAX_DOCS_ON, docFields, sameDoc, withDocs, type DocFile } from "./docs";
 import { MAX_LINES, MAX_OPEN, arrive, fromLine, lineFields, lineKey, orderFields, supplierRef, type OrderLine } from "./orders";
 import { BadCode, codeKey, family as familyOf, labelUrl, mintOwn, normalise, type Code, type Family } from "./codes";
 import {
@@ -29,7 +33,7 @@ import {
 } from "./intake";
 import {
   ARTICLE, BOX, MAX_FILE_BYTES, MAX_FILES, MAX_LINKS, LINK_KINDS, UNIT, Refused, UNIT_STEP, articleFields, boxFields, boxFits, boxable,
-  batchNames, supplierRefs, counts, fileName, linkFields, mintId, qty, wouldLoop, accepted, proposalFields, MAX_PROPOSED, MAX_BOX_DEPTH,
+  batchNames, supplierRefs, SUPPLIER_REF, counts, fileName, linkFields, mintId, qty, wouldLoop, accepted, proposalFields, MAX_PROPOSED, MAX_BOX_DEPTH,
   category as stockCategory, inCategory, catalogue,
   type Article, type Box, type BoxFile, type BoxLink, type Step, type Unit
 } from "./stock";
@@ -1265,19 +1269,24 @@ export async function intakeCheckIn(actor: Actor, tenantId: string, id: string, 
   // where it was bought, from its order line (ADR-0023)
   const bought = line ? supplierRef(line) : undefined;
   const refs = bought ? supplierRefs(existing?.supplierRefs, bought) : undefined;
+  // and the documents that came with it (ADR-0024)
+  const docs = line?.files?.length ? withDocs(existing?.files, line.files) : undefined;
+  const files = docs?.added.length ? docs.list : undefined;
   if (existing) {
     aid = existing.id;
     tx.push({ Update: {
       TableName: T.articles(), Key: { tenantId, id: aid },
-      UpdateExpression: "SET updatedAt = :at" + (refs ? ", supplierRefs = :sr" : "") + " ADD onHand :q, #f :q" + (bulk ? ", boxed :q" : ""),
+      UpdateExpression: "SET updatedAt = :at" + (refs ? ", supplierRefs = :sr" : "") + (files ? ", files = :fl" : "")
+        + " ADD onHand :q, #f :q" + (bulk ? ", boxed :q" : ""),
       ConditionExpression: "attribute_exists(id) AND attribute_not_exists(proposed)",
-      ExpressionAttributeNames: { "#f": "free" }, ExpressionAttributeValues: { ":at": at, ":q": q, ...(refs ? { ":sr": refs } : {}) },
+      ExpressionAttributeNames: { "#f": "free" },
+      ExpressionAttributeValues: { ":at": at, ":q": q, ...(refs ? { ":sr": refs } : {}), ...(files ? { ":fl": files } : {}) },
     } });
   } else {
     aid = mintId("a");
     tx.push({ Put: {
       TableName: T.articles(), ConditionExpression: "attribute_not_exists(id)",
-      Item: JSON.parse(JSON.stringify({ ...s!.article, ...(refs ? { supplierRefs: refs } : {}), tenantId, id: aid, onHand: q, free: q, reserved: 0, ...(bulk ? { boxed: q } : {}),
+      Item: JSON.parse(JSON.stringify({ ...s!.article, ...(refs ? { supplierRefs: refs } : {}), ...(files ? { files } : {}), tenantId, id: aid, onHand: q, free: q, reserved: 0, ...(bulk ? { boxed: q } : {}),
         intake: { by: actor.by, at }, createdAt: at, updatedAt: at, createdBy: actor.by })),
     } });
   }
@@ -1423,6 +1432,149 @@ export async function orderDrop(actor: Actor, tenantId: string, id: string) {
     throw e;
   }
   return { dropped: id };
+}
+
+/* ----------------------------------------------------------- documents ---- *
+ * ADR-0024 in maker-5-shared. The documents that came with a part: an edge
+ * reads a supplier's e-mail, uploads each attachment once (docUpload, then a
+ * PUT to the signed link) and attaches it to the articles and order lines it
+ * concerns (docAttach). The same content (sha256) is never uploaded twice.
+ * Anyone in the organisation adds and removes them, as with a box's files.
+ */
+
+const docKey = (tenantId: string, fileId: string) => `docs/${tenantId}/${fileId}`;
+
+async function articlesOf(tenantId: string): Promise<Article[]> {
+  return query<Article>({ TableName: T.articles(), KeyConditionExpression: "tenantId = :t", ExpressionAttributeValues: { ":t": tenantId } }, 5000);
+}
+
+/** Where a document is kept already: by its id or its content. */
+async function docsLike(tenantId: string, d: Pick<DocFile, "id" | "sha256">) {
+  const [articles, lines] = await Promise.all([articlesOf(tenantId), ordersOf(tenantId)]);
+  const on = (files?: DocFile[]) => (files ?? []).find((f) => sameDoc(f, d));
+  return {
+    articles: articles.filter((a) => on(a.files)).map((a) => ({ id: a.id, name: a.name, file: on(a.files)! })),
+    lines: lines.filter((l) => on(l.files)).map((l) => ({ id: l.id, title: l.title, file: on(l.files)! })),
+  };
+}
+
+/**
+ * A short-lived upload link for one document, or, when the organisation has
+ * the same content already, that document (exists: true) and no link.
+ */
+export async function docUpload(actor: Actor, tenantId: string, f: Record<string, unknown>) {
+  reads(actor, tenantId);
+  const d = docFields(f);
+  if (d.sha256) {
+    const had = await docsLike(tenantId, { id: "", sha256: d.sha256 });
+    const first = had.articles[0]?.file ?? had.lines[0]?.file;
+    if (first) return { exists: true, fileId: first.id, file: first, articles: had.articles.map(({ file: _f, ...a }) => a) };
+  }
+  const fileId = randomBytes(6).toString("hex");
+  const url = await getSignedUrl(s3, new PutObjectCommand({
+    Bucket: BUCKET(), Key: docKey(tenantId, fileId), ContentLength: d.size, ContentType: d.type,
+  }), { expiresIn: 900, signableHeaders: new Set(["content-length", "content-type"]) });
+  return { exists: false, fileId, url, ...d };
+}
+
+/** A document (uploaded, or kept already) onto articles and expected order lines. */
+export async function docAttach(actor: Actor, tenantId: string, b: Record<string, unknown>) {
+  reads(actor, tenantId);
+  const fileId = String(b.fileId ?? "");
+  if (!DOC_ID.test(fileId)) throw new Refused("No such document.");
+  const articleIds = (Array.isArray(b.articleIds) ? b.articleIds : []).map(String);
+  const lineIds = (Array.isArray(b.orderLineIds) ? b.orderLineIds : []).map(String);
+  if (!articleIds.length && !lineIds.length) throw new Refused("A document goes onto a part or an order line.");
+  if (articleIds.length + lineIds.length > MAX_LINES) throw new Refused(`At most ${MAX_LINES} parts at once.`);
+  let size = 0;
+  try {
+    size = Number((await s3.send(new HeadObjectCommand({ Bucket: BUCKET(), Key: docKey(tenantId, fileId) }))).ContentLength ?? 0);
+  } catch { throw new Refused("The document has not arrived; upload it again."); }
+  const kept = (await docsLike(tenantId, { id: fileId })).articles[0]?.file;
+  const d = kept ?? { id: fileId, ...docFields({ ...b, size }), at: now(), by: actor.by };
+  const file = JSON.parse(JSON.stringify(d)) as DocFile;
+  const onArticles: string[] = [];
+  for (const id of [...new Set(articleIds)]) {
+    const a = await mustArticle(tenantId, id);
+    const { added } = withDocs(a.files, [file]);
+    if (!added.length) continue;
+    await transact([
+      { Update: {
+        TableName: T.articles(), Key: { tenantId, id },
+        UpdateExpression: "SET files = list_append(if_not_exists(files, :none), :one), updatedAt = :at",
+        ConditionExpression: "attribute_exists(id) AND (attribute_not_exists(files) OR size(files) < :max)",
+        ExpressionAttributeValues: { ":none": [], ":one": [file], ":at": now(), ":max": MAX_DOCS_ON },
+      } },
+      movement({ tenantId, kind: "file", articleId: id, qty: 0, by: actor.by, note: `${file.kind}: ${file.name}` }),
+    ], "That part keeps as many documents as it can.");
+    onArticles.push(id);
+  }
+  const onLines: string[] = [];
+  for (const id of [...new Set(lineIds)]) {
+    const l = await mustOrderLine(tenantId, id);
+    if (l.status !== "open") throw new Refused("That order line is closed: put the document on its article.");
+    const { added } = withDocs(l.files, [file]);
+    if (!added.length) continue;
+    await transact([{ Update: {
+      TableName: T.orders(), Key: { tenantId, id },
+      UpdateExpression: "SET files = list_append(if_not_exists(files, :none), :one)",
+      ConditionExpression: "#s = :open AND (attribute_not_exists(files) OR size(files) < :max)",
+      ExpressionAttributeNames: { "#s": "status" },
+      ExpressionAttributeValues: { ":none": [], ":one": [file], ":open": "open", ":max": MAX_DOCS_ON },
+    } }], "That order line is closed, or keeps as many documents as it can.");
+    onLines.push(id);
+  }
+  return { file, articles: onArticles, orderLines: onLines };
+}
+
+/** A download link for one of an article's documents. */
+export async function articleFileUrl(actor: Actor, tenantId: string, articleId: string, fileId: string) {
+  reads(actor, tenantId);
+  const a = await mustArticle(tenantId, articleId);
+  const f = (a.files ?? []).find((x) => x.id === fileId);
+  if (!f) throw new Refused("No such document on this part.");
+  const url = await getSignedUrl(s3, new GetObjectCommand({
+    Bucket: BUCKET(), Key: docKey(tenantId, f.id),
+    ResponseContentDisposition: `attachment; filename="${f.name.replace(/[^\x20-\x7e]/g, "_")}"; filename*=UTF-8''${encodeURIComponent(f.name)}`,
+  }), { expiresIn: 300 });
+  return { url, name: f.name };
+}
+
+/** A document off an article; the file goes when nothing lists it any more. */
+export async function articleFileRemove(actor: Actor, tenantId: string, articleId: string, fileId: string) {
+  reads(actor, tenantId);
+  const a = await mustArticle(tenantId, articleId) as Article & { updatedAt?: string };
+  const gone = (a.files ?? []).find((x) => x.id === fileId);
+  if (!gone) throw new Refused("No such document on this part.");
+  await transact([
+    { Update: {
+      TableName: T.articles(), Key: { tenantId, id: articleId },
+      UpdateExpression: "SET files = :l, updatedAt = :at", ConditionExpression: "updatedAt = :seen",
+      ExpressionAttributeValues: { ":l": (a.files ?? []).filter((x) => x.id !== fileId), ":at": now(), ":seen": a.updatedAt },
+    } },
+    movement({ tenantId, kind: "file", articleId, qty: 0, by: actor.by, note: `removed ${gone.name}` }),
+  ]);
+  const still = await docsLike(tenantId, { id: fileId });
+  if (!still.articles.length && !still.lines.length) {
+    await s3.send(new DeleteObjectCommand({ Bucket: BUCKET(), Key: docKey(tenantId, fileId) }));
+  }
+  return { removed: fileId };
+}
+
+/** Where an article is bought, without a check-in: a supplier's document named it. */
+export async function articleRef(actor: Actor, tenantId: string, articleId: string, ref: string) {
+  reads(actor, tenantId);
+  const r = String(ref ?? "").trim();
+  if (!SUPPLIER_REF.test(r)) throw new Refused(`${r} is no "<shop>:<article number>".`);
+  const a = await mustArticle(tenantId, articleId) as Article & { updatedAt?: string };
+  if ((a.supplierRefs ?? []).includes(r)) return { id: a.id, supplierRefs: a.supplierRefs };
+  const refs = supplierRefs(a.supplierRefs, r);
+  await doc.send(new UpdateCommand({
+    TableName: T.articles(), Key: { tenantId, id: articleId },
+    UpdateExpression: "SET supplierRefs = :r, updatedAt = :at", ConditionExpression: "attribute_exists(id)",
+    ExpressionAttributeValues: { ":r": refs, ":at": now() },
+  }));
+  return { id: a.id, supplierRefs: refs };
 }
 
 /* ------------------------------------------------------------ helpers ---- */

@@ -1280,5 +1280,9 @@ a {
 .mk-gate__brand { margin: var(--mk-space-4) 0 0; font-size: 1.25rem; }
 
 /* orders expected (ADR-0023) */
+.mk-docs { margin: .75rem 0; }
+.mk-docs__title { font-size: 1rem; margin: 0 0 .25rem; }
+.mk-docs__list { list-style: none; margin: 0; padding: 0; }
+.mk-docs__list li { padding: .2rem 0; overflow-wrap: anywhere; }
 .mk-intakebox__expected { margin-top: 1.5rem; }
 .mk-intakebox__expected h3 { font-size: 1rem; margin: 0 0 .25rem; }

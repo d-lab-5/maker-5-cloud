@@ -467,6 +467,23 @@ function ArticlePanel({ tenantId, id, admin, onChanged, onLabels }: {
           ? <a href={l.href} target="_blank" rel="noreferrer">{l.label}</a> : l.label}</React.Fragment>; })}
       </p>
       {a.note && <p className="mk-panel__hint">{a.note}</p>}
+      {(a.files ?? []).length > 0 && (
+        <div className="mk-docs">
+          <h3 className="mk-docs__title">{t("mt.docs")}</h3>
+          <ul className="mk-docs__list">
+            {(a.files ?? []).map((f) => (
+              <li key={f.id}>
+                <button type="button" className="mk-linkbutton" onClick={() => void m.articleFileUrl(tenantId, a.id, f.id)
+                  .then((x) => window.location.assign(x.url), (e) => setError(message(e)))}>{f.name}</button>
+                <span className="mk-muted"> · {t(`bx.link.${f.kind}`)}{f.source ? ` · ${f.source}` : ""} · {f.at.slice(0, 10)}</span>{" "}
+                <button type="button" className="mk-linkbutton" aria-label={t("mt.docs.remove", { name: f.name })}
+                  onClick={() => { if (window.confirm(t("mt.docs.removeAsk", { name: f.name }))) void run(() => m.articleFileRemove(tenantId, a.id, f.id), t("mt.docs.removed")); }}>
+                  {t("mt.docs.removeShort")}</button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {a.proposed && (
         <div className="mk-take">
           <p><strong>{t("mt.proposed")}</strong> · {t("mt.proposed.by", { by: a.proposed.by, at: a.proposed.at.slice(0, 10) })}</p>

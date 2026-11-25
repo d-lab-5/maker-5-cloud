@@ -68,6 +68,8 @@ export interface Article {
   family?: "dhc";
   /** Made by checking in an item of the intake (ADR-0022): who and when. */
   intake?: { by: string; at: string };
+  /** Its documents (ADR-0024): invoices, delivery notes, service reports, datasheets. */
+  files?: import("./docs").DocFile[];
 }
 export interface Unit {
   tenantId: string; id: string; articleId: string; serial?: string; state: (typeof UNIT_STATES)[number];
@@ -185,7 +187,8 @@ export const UNIT_STEP: Record<Step, { from: Unit["state"]; to: Unit["state"] }>
 /** cabinet and bench are the top of a workshop: a wall cabinet, a workbench, holding shelves and boxes. */
 export const BOX_KINDS = ["box", "bag", "folder", "drawer", "shelf", "cabinet", "bench"] as const;
 export const MAX_BATCH = 48;
-export const LINK_KINDS = ["firmware", "cad", "schematic", "datasheet", "docs", "repo", "other"] as const;
+/** receipt: an invoice, a delivery note or a service report (ADR-0024). */
+export const LINK_KINDS = ["firmware", "cad", "schematic", "datasheet", "docs", "receipt", "repo", "other"] as const;
 export const MAX_BOX_DEPTH = 8;
 export const MAX_LINKS = 30;
 export const MAX_FILES = 50;

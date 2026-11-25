@@ -77,6 +77,9 @@ export const handler = async (event: AppSyncResolverEvent<Args>) => {
       case "orders": return await st.ordersList(actor, t, a.status === undefined ? "open" : String(a.status));
       case "ordersAdd": return await st.ordersAdd(actor, t, a);
       case "orderDrop": return await st.orderDrop(actor, t, String(a.id));
+      // a part's documents (ADR-0024): anyone in the organisation
+      case "articleFileUrl": return await st.articleFileUrl(actor, t, String(a.articleId), String(a.fileId));
+      case "articleFileRemove": return await st.articleFileRemove(actor, t, String(a.articleId), String(a.fileId));
       case "makeBoxes": return await st.makeBoxes(actor, t, a);
       case "moveBox": return await st.moveBox(actor, t, String(a.id), a);
       case "deleteBox": return await st.deleteBox(actor, t, String(a.id));
