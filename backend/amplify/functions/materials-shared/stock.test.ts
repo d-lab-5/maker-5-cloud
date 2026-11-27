@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ARTICLE, BOX, MAX_BATCH, batchNames, MAX_BOX_DEPTH, MAX_PROPOSE, UNIT, Refused, accepted, proposalFields, boxFields, boxFits, boxable, fileName, linkFields, UNIT_STEP, articleFields, counts, mintId, qty, wouldLoop, type Article } from "./stock";
+import { ARTICLE, BOX, MAX_BATCH, batchNames, MAX_BOX_DEPTH, MAX_PROPOSE, UNIT, Refused, accepted, proposalFields, boxFields, boxFits, boxable, fileName, linkFields, UNIT_STEP, articleFields, counts, deletable, mintId, qty, wouldLoop, type Article } from "./stock";
 
 // Stock rules (ADR-0008, ADR-0010 in maker-5-shared).
 
@@ -127,4 +127,14 @@ test("ADR-0019: two levels of category, the old values mapped", async () => {
   assert.equal(of("media").articles, 1);
   assert.equal(of("components").articles, 0, "a proposed article is not counted");
   assert.equal(of("controllers").label.de, "Steuerungen & Rechner");
+});
+
+test("an article made by mistake goes, unless something of it is reserved, in use or expected", () => {
+  const free = { units: [{ state: "in-stock" as const }], allocations: [{ reserved: 0 }], inside: 0, expected: false };
+  assert.equal(deletable({ name: "Robot", reserved: 0 }, free), undefined);
+  assert.match(deletable({ name: "Robot", reserved: 1 }, free)!, /reserved/);
+  assert.match(deletable({ name: "Robot", reserved: 0 }, { ...free, allocations: [{ reserved: 2 }] })!, /reserved/);
+  assert.match(deletable({ name: "Robot", reserved: 0 }, { ...free, units: [{ state: "in-use" }] })!, /in-use/);
+  assert.match(deletable({ name: "Robot", reserved: 0 }, { ...free, inside: 1 })!, /installed/);
+  assert.match(deletable({ name: "Robot", reserved: 0 }, { ...free, expected: true })!, /order line/);
 });

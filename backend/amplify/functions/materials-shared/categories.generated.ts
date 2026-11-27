@@ -56,6 +56,42 @@ export const CATEGORY_LIST: Category[] = [
   }
  },
  {
+  "code": "robots",
+  "top": null,
+  "label": {
+   "en": "Robots",
+   "de": "Roboter",
+   "fr": "Robots"
+  }
+ },
+ {
+  "code": "robots/educational",
+  "top": "robots",
+  "label": {
+   "en": "Educational & toy robots",
+   "de": "Lern- & Spielroboter",
+   "fr": "Robots éducatifs & jouets"
+  }
+ },
+ {
+  "code": "robots/mobile",
+  "top": "robots",
+  "label": {
+   "en": "Mobile robots & rovers",
+   "de": "Mobile Roboter & Rover",
+   "fr": "Robots mobiles & rovers"
+  }
+ },
+ {
+  "code": "robots/arms",
+  "top": "robots",
+  "label": {
+   "en": "Robot arms",
+   "de": "Roboterarme",
+   "fr": "Bras robotiques"
+  }
+ },
+ {
   "code": "sensors",
   "top": null,
   "label": {

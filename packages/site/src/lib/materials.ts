@@ -89,6 +89,8 @@ export const spaceMaterials = (spaceId: string) =>
 export const saveArticle = (tenantId: string, a: Partial<Article>) => change<Article>("saveArticle", { tenantId, article: a });
 export const acceptArticle = (tenantId: string, id: string) => change<Article>("acceptArticle", { tenantId, id });
 export const dropProposed = (tenantId: string, id: string) => change<{ deleted: string }>("dropProposed", { tenantId, id });
+export const deleteArticle = (tenantId: string, id: string) =>
+  change<{ deleted: string; units: number; boxes: number }>("deleteArticle", { tenantId, id });
 export const receive = (tenantId: string, articleId: string, r: { qty?: number; units?: Array<{ serial?: string; location?: string }>; note?: string }) =>
   change<{ received: number; units: Unit[] }>("receive", { tenantId, articleId, ...r });
 export const adjust = (tenantId: string, articleId: string, onHand: number, note?: string) => change("adjust", { tenantId, articleId, onHand, note });

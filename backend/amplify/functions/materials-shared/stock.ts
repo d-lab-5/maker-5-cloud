@@ -132,6 +132,22 @@ export function articleFields(a: Record<string, unknown>, existing?: Article) {
   };
 }
 
+/**
+ * Whether an article made by mistake may be deleted, and if not, why: nothing
+ * of it reserved or in use, nothing installed in its units, no open order
+ * line expecting it. What it simply has in stock goes with it.
+ */
+export function deletable(a: Pick<Article, "name" | "reserved">, x: {
+  units: Array<Pick<Unit, "state">>; allocations: Array<{ reserved?: number }>; inside: number; expected: boolean;
+}): string | undefined {
+  if (a.reserved > 0 || x.allocations.some((l) => (l.reserved ?? 0) > 0)) return `Some of ${a.name} is reserved for a workspace: release it first.`;
+  const busy = x.units.find((u) => u.state === "reserved" || u.state === "in-use");
+  if (busy) return `A unit of ${a.name} is ${busy.state}: return it first.`;
+  if (x.inside > 0) return "Something is installed in a unit of it: take it out first.";
+  if (x.expected) return "An open order line expects it: drop that line first.";
+  return undefined;
+}
+
 /* -- articles an edge proposes (ADR-0014) ---------------------------------- */
 
 export const MAX_PROPOSE = 50;      // in one call
